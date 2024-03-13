@@ -1,0 +1,8 @@
+# Editors
+.vscode/
+
+# Byte-compiled / optimized / DLL files
+__pycache__/
+
+# Ignore output files
+2023_embeddings_2/
