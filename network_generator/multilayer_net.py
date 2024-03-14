@@ -7,16 +7,17 @@ import os
 # import collections
 from tqdm import tqdm
 # import pyautogui
-# import math
+import math
 # import random
 import json
 
 class MultiLayerNetwork:
-    def __init__(self, midifilename, outfolder, options=None, **kwargs):
+    def __init__(self, midifilename, outfolder, **kwargs):
         self.rest = self.get_param_or_default(kwargs, "rest", False)
         self.octave = self.get_param_or_default(kwargs, "octave", False)
         self.pitch = self.get_param_or_default(kwargs, "pitch", True)
         self.duration = self.get_param_or_default(kwargs, "duration", False)
+        self.offset = self.get_param_or_default(kwargs, "offset", False)
         self.Net=nx.DiGraph()
         self.subNet = []
         self.outfolder = outfolder
@@ -59,6 +60,8 @@ class MultiLayerNetwork:
                     node["pitch"] = " ".join(list(set([pitch.name for pitch in elt.pitches])))
         if self.duration:
             node["duration"] = elt.duration.quarterLength
+        if self.offset:
+            node["offset"] = elt.offset - math.floor(elt.offset)
         return str(node)
 
     def node_infos(self, node):
@@ -117,7 +120,7 @@ if __name__ == "__main__" :
     output_folder = 'results'  # Replace with your desired output folder
     
     # Create the MultiLayerNetwork object with the MIDI file and output folder
-    net1 = MultiLayerNetwork(input_file_path, output_folder)
+    net1 = MultiLayerNetwork(input_file_path, output_folder, pitch=False, duration=True, offset=True)
 
     # Call createNet function
     net1.create_net()
