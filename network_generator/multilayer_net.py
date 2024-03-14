@@ -94,8 +94,11 @@ class MultiLayerNetwork:
         self.Net.add_node(node, l=i)
     
     def add_or_update_edge(self, previous_node, node):
-        if previous_node is not None:
-            self.Net.add_edge(previous_node, node)
+        if previous_node is None: return
+        if node in self.Net[previous_node]:
+            self.Net[previous_node][node]["weight"] += 1
+        else:
+            self.Net.add_edge(previous_node, node, weight=1)
 
     def export_net(self, filename):
         """Export the network to a graphml file
