@@ -18,6 +18,7 @@ class MultiLayerNetwork:
         self.pitch = self.get_param_or_default(kwargs, "pitch", True)
         self.duration = self.get_param_or_default(kwargs, "duration", False)
         self.offset = self.get_param_or_default(kwargs, "offset", False)
+        self.offset_period = self.get_param_or_default(kwargs, "offset_period", 1)
         self.Net=nx.DiGraph()
         self.subNet = []
         self.outfolder = outfolder
@@ -61,7 +62,7 @@ class MultiLayerNetwork:
         if self.duration:
             node["duration"] = elt.duration.quarterLength
         if self.offset:
-            node["offset"] = elt.offset - math.floor(elt.offset)
+            node["offset"] = elt.offset - self.offset_period*math.floor(elt.offset/self.offset_period)
         return str(node)
 
     def node_infos(self, node):
@@ -123,7 +124,7 @@ if __name__ == "__main__" :
     output_folder = 'results'  # Replace with your desired output folder
     
     # Create the MultiLayerNetwork object with the MIDI file and output folder
-    net1 = MultiLayerNetwork(input_file_path, output_folder, pitch=False, duration=True, offset=True)
+    net1 = MultiLayerNetwork(input_file_path, output_folder, pitch=False, duration=True, offset=True, offset_period=4)
 
     # Call createNet function
     net1.create_net()
