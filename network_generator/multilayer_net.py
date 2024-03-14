@@ -76,6 +76,8 @@ class MultiLayerNetwork:
         for i in range(s_len):  # For each instrument
             last_note = self.process_intra_layer(i)
             pbar.update(1)
+        print("[+] Creating network - Inter-layer processing")
+        self.process_inter_layer()
         return self.Net
 
     def process_intra_layer(self, i, previous_node=None):
@@ -88,18 +90,32 @@ class MultiLayerNetwork:
             self.add_or_update_edge(previous_node, node)
             previous_node = node
     
-    def process_inter_layer(self, ):
-        pass
+    def process_inter_layer(self):
+        s_len = len(self.stream_list)
+        all_nodes_infos = [(elt.offset, elt.quarterLength, idx, self.build_node(elt,idx)) for idx in range(s_len) 
+            for elt in self.stream_list[idx].flatten().notesAndRests if self.is_buildable(elt)]
+        all_nodes_infos.sort(key=lambda x: x[0])
+        nb_notes = len(all_nodes_infos)
+        for i in range(nb_notes):
+            offset, duration, idx, node = all_nodes_infos[i]
+            j = i+1
+            while  j<nb_notes and all_nodes_infos[j][0] < offset + duration:
+                offset2, duration2, idx2, node2 = all_nodes_infos[j]
+                if idx != idx2:
+                    # add undirected edge
+                    self.add_or_update_edge(node, node2)
+                    self.add_or_update_edge(node2, node)
+                j += 1
 
     def add_or_update_node(self, node, i):
         self.Net.add_node(node, l=i)
     
-    def add_or_update_edge(self, previous_node, node):
-        if previous_node is None: return
-        if node in self.Net[previous_node]:
-            self.Net[previous_node][node]["weight"] += 1
+    def add_or_update_edge(self, from_node, to_node):
+        if from_node is None: return
+        if self.Net.has_edge(from_node, to_node):
+            self.Net[from_node][to_node]["weight"] += 1
         else:
-            self.Net.add_edge(previous_node, node, weight=1)
+            self.Net.add_edge(from_node, to_node, weight=1)
 
     def export_net(self, filename):
         """Export the network to a graphml file
@@ -117,6 +133,14 @@ class MultiLayerNetwork:
         print("[+] Converting MIDI file to network")
         self.stream_to_network()
     
+    def get_net(self):
+        """Getter for the network
+
+        Returns:
+            NetwrokX: The main network
+        """
+        return self.Net
+    
     
 
 if __name__ == "__main__" :
@@ -124,7 +148,7 @@ if __name__ == "__main__" :
     output_folder = 'results'  # Replace with your desired output folder
     
     # Create the MultiLayerNetwork object with the MIDI file and output folder
-    net1 = MultiLayerNetwork(input_file_path, output_folder, pitch=False, duration=True, offset=True, offset_period=4)
+    net1 = MultiLayerNetwork(input_file_path, output_folder, pitch=True, duration=False, offset=False, offset_period=4)
 
     # Call createNet function
     net1.create_net()
@@ -145,3 +169,4 @@ if __name__ == "__main__" :
     # Export the multilayer network
     net1.export_net(os.path.join(subfolder_path, output_filename))
 
+ms.stream.iterator
