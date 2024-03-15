@@ -19,7 +19,7 @@ class MultiLayerNetwork:
         self.duration = self.get_param_or_default(kwargs, "duration", False)
         self.offset = self.get_param_or_default(kwargs, "offset", False)
         self.offset_period = self.get_param_or_default(kwargs, "offset_period", 1)
-        self.Net=nx.DiGraph()
+        self.net=nx.DiGraph()
         self.subNet = []
         self.outfolder = outfolder
         self.stream_list=[]; self.negative_stream_list=[]
@@ -43,31 +43,47 @@ class MultiLayerNetwork:
             return False
         return True
 
-    def build_node(self, elt, i):
-        assert(self.is_buildable(elt))
-        node = {"layer":i}
-        if elt.isRest:
-            node["rest"] = True
+    def build_node(self, infos):
+        node = {}
+        node["layer"] = infos["layer"]
+        if self.rest:
+            node["rest"] = infos["rest"]
         if self.pitch:
-            if elt.isNote:
-                if self.octave:
-                    node["pitch"] = str(elt.pitch)
-                else:
-                    node["pitch"] = elt.pitch.name
-            if elt.isChord:
-                if self.octave:
-                    unique_notes = list(set([str(pitch) for pitch in elt.pitches]))
-                    unique_notes.sort(key=lambda elt : ms.pitch.Pitch(elt).midi)
-                    node["pitch"] = " ".join(unique_notes)
-                else:
-                    unique_notes = list(set([str(pitch.name) for pitch in elt.pitches]))
-                    unique_notes.sort(key=lambda elt : ms.pitch.Pitch(elt).midi)
-                    node["pitch"] = " ".join(unique_notes)
+            node["pitch"] = infos["pitch"]
         if self.duration:
-            node["duration"] = elt.duration.quarterLength
+            node["duration"] = infos["duration"]
         if self.offset:
-            node["offset"] = elt.offset - self.offset_period*math.floor(elt.offset/self.offset_period)
+            node["offset"] = infos["offset"]
         return str(node)
+    
+    def parse_elt(self, elt, i):
+        assert(self.is_buildable(elt))
+        infos = {}
+        infos["layer"] = i
+        infos["rest"] = elt.isRest
+        infos["duration"] = elt.duration.quarterLength
+        infos["offset"] = elt.offset - self.offset_period*math.floor(elt.offset/self.offset_period)
+        infos["pitch"] = self.parse_pitch(elt)
+        return infos
+    
+    def parse_pitch(self,elt):
+        if elt.isNote:
+            if self.octave:
+                return str(elt.pitch)
+            else:
+                return elt.pitch.name
+        if elt.isChord:
+            if self.octave:
+                unique_notes = list(set([str(pitch) for pitch in elt.pitches]))
+                unique_notes.sort(key=lambda elt : ms.pitch.Pitch(elt).midi)
+                return " ".join(unique_notes)
+            else:
+                unique_notes = list(set([str(pitch.name) for pitch in elt.pitches]))
+                unique_notes.sort(key=lambda elt : ms.pitch.Pitch(elt).midi)
+                return " ".join(unique_notes)
+        if elt.isRest:
+            return "rest"
+        assert(False)
 
     def node_infos(self, node):
         return json.loads(node)
@@ -82,13 +98,14 @@ class MultiLayerNetwork:
             pbar.update(1)
         print("[+] Creating network - Inter-layer processing")
         self.process_inter_layer()
-        return self.Net
+        return self.net
 
     def process_intra_layer(self, i, previous_node=None):
         s_flat = self.stream_list[i].flatten()
         for elt in s_flat.notesAndRests:
             if not self.is_buildable(elt): continue
-            node = self.build_node(elt, i)
+            infos = self.parse_elt(elt, i)
+            node = self.build_node(infos)
             timestamp = float(elt.offset)
             self.add_or_update_node(node, i)
             self.add_or_update_edge(previous_node, node)
@@ -96,7 +113,7 @@ class MultiLayerNetwork:
     
     def process_inter_layer(self):
         s_len = len(self.stream_list)
-        all_nodes_infos = [(elt.offset, elt.quarterLength, idx, self.build_node(elt,idx)) for idx in range(s_len) 
+        all_nodes_infos = [(elt.offset, elt.quarterLength, idx, self.build_node(self.parse_elt(elt, idx))) for idx in range(s_len) 
             for elt in self.stream_list[idx].flatten().notesAndRests if self.is_buildable(elt)]
         all_nodes_infos.sort(key=lambda x: x[0])
         nb_notes = len(all_nodes_infos)
@@ -104,7 +121,7 @@ class MultiLayerNetwork:
             offset, duration, idx, node = all_nodes_infos[i]
             j = i+1
             while  j<nb_notes and all_nodes_infos[j][0] < offset + duration:
-                offset2, duration2, idx2, node2 = all_nodes_infos[j]
+                _, _, idx2, node2 = all_nodes_infos[j]
                 if idx != idx2:
                     # add undirected edge
                     self.add_or_update_edge(node, node2)
@@ -112,14 +129,14 @@ class MultiLayerNetwork:
                 j += 1
 
     def add_or_update_node(self, node, i):
-        self.Net.add_node(node, l=i)
+        self.net.add_node(node, l=i)
     
     def add_or_update_edge(self, from_node, to_node):
         if from_node is None: return
-        if self.Net.has_edge(from_node, to_node):
-            self.Net[from_node][to_node]["weight"] += 1
+        if self.net.has_edge(from_node, to_node):
+            self.net[from_node][to_node]["weight"] += 1
         else:
-            self.Net.add_edge(from_node, to_node, weight=1)
+            self.net.add_edge(from_node, to_node, weight=1)
 
     def export_net(self, filename):
         """Export the network to a graphml file
@@ -129,7 +146,7 @@ class MultiLayerNetwork:
         """
 
         print("[+] Writing main graphml file to : " + filename)
-        nx.write_graphml(self.Net, filename)
+        nx.write_graphml(self.net, filename)
 
     def create_net(self):
         """Create the main network
@@ -143,7 +160,27 @@ class MultiLayerNetwork:
         Returns:
             NetwrokX: The main network
         """
-        return self.Net
+        return self.net
+    
+    def get_sub_net(self, layer=None):
+        """Return the list of subnetworks
+
+        Args:
+            layer (Number of the layer, optional): Specify the layer to return. Defaults to None.
+
+        Returns:
+            List NetworkX: The list of subnetworks
+        """
+        #list of subnets (maybe to change function in multilayer class)
+        # s_len=len(self.stream_list)
+        # self.subNet =[]
+        # for i in range (0,s_len):
+        #     self.subNet.append(nx.subgraph_view(self.net, lambda : ))
+        # t=self.filter_edges(n)
+        # H = n.edge_subgraph(t)
+        # self.intergraph = H.to_undirected()
+        # return self.subNet, self.intergraph
+        pass
     
     
 
