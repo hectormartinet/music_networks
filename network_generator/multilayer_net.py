@@ -20,7 +20,7 @@ class MultiLayerNetwork:
         self.offset = self.get_param_or_default(kwargs, "offset", False)
         self.offset_period = self.get_param_or_default(kwargs, "offset_period", 1)
         self.net=nx.DiGraph()
-        self.subNet = []
+        self.sub_net = []
         self.outfolder = outfolder
         self.stream_list=[]; self.negative_stream_list=[]
         self.instruments=[]
@@ -43,9 +43,19 @@ class MultiLayerNetwork:
             return False
         return True
 
+    def parse_elt(self, elt, i):
+        assert(self.is_buildable(elt))
+        infos = {}
+        infos["layer"] = i
+        infos["rest"] = elt.isRest
+        infos["duration"] = elt.duration.quarterLength
+        infos["offset"] = elt.offset - self.offset_period*math.floor(elt.offset/self.offset_period)
+        infos["timestamp"] = elt.offset
+        infos["pitch"] = self.parse_pitch(elt)
+        return infos
+
     def build_node(self, infos):
         node = {}
-        node["layer"] = infos["layer"]
         if self.rest:
             node["rest"] = infos["rest"]
         if self.pitch:
@@ -54,17 +64,7 @@ class MultiLayerNetwork:
             node["duration"] = infos["duration"]
         if self.offset:
             node["offset"] = infos["offset"]
-        return str(node)
-    
-    def parse_elt(self, elt, i):
-        assert(self.is_buildable(elt))
-        infos = {}
-        infos["layer"] = i
-        infos["rest"] = elt.isRest
-        infos["duration"] = elt.duration.quarterLength
-        infos["offset"] = elt.offset - self.offset_period*math.floor(elt.offset/self.offset_period)
-        infos["pitch"] = self.parse_pitch(elt)
-        return infos
+        return (infos["layer"],str(node))
     
     def parse_pitch(self,elt):
         if elt.isNote:
@@ -84,9 +84,6 @@ class MultiLayerNetwork:
         if elt.isRest:
             return "rest"
         assert(False)
-
-    def node_infos(self, node):
-        return json.loads(node)
     
     def stream_to_network(self):
         s_len = len(self.stream_list)
@@ -106,9 +103,8 @@ class MultiLayerNetwork:
             if not self.is_buildable(elt): continue
             infos = self.parse_elt(elt, i)
             node = self.build_node(infos)
-            timestamp = float(elt.offset)
-            self.add_or_update_node(node, i)
-            self.add_or_update_edge(previous_node, node)
+            self.add_or_update_node(node, infos)
+            self.add_or_update_edge(previous_node, node, inter=False)
             previous_node = node
     
     def process_inter_layer(self):
@@ -124,19 +120,28 @@ class MultiLayerNetwork:
                 _, _, idx2, node2 = all_nodes_infos[j]
                 if idx != idx2:
                     # add undirected edge
-                    self.add_or_update_edge(node, node2)
-                    self.add_or_update_edge(node2, node)
+                    self.add_or_update_edge(node, node2, inter=True)
+                    self.add_or_update_edge(node2, node, inter=True)
                 j += 1
 
-    def add_or_update_node(self, node, i):
-        self.net.add_node(node, l=i)
+    def add_or_update_node(self, node, infos):
+        if not self.net.has_node(node):
+            self.net.add_node(node, 
+                #weight=1, 
+                layer = infos["layer"], 
+                pitch = infos["pitch"],
+                duration = str(infos["duration"]),
+                offset = str(infos["offset"]),
+                #timestamps = [infos["timestamp"]],
+                rest = infos["rest"],
+            )
     
-    def add_or_update_edge(self, from_node, to_node):
-        if from_node is None: return
+    def add_or_update_edge(self, from_node, to_node, inter):
+        if from_node is None or to_node is None: return
         if self.net.has_edge(from_node, to_node):
             self.net[from_node][to_node]["weight"] += 1
         else:
-            self.net.add_edge(from_node, to_node, weight=1)
+            self.net.add_edge(from_node, to_node, weight=1, inter=inter)
 
     def export_net(self, filename):
         """Export the network to a graphml file
@@ -147,6 +152,22 @@ class MultiLayerNetwork:
 
         print("[+] Writing main graphml file to : " + filename)
         nx.write_graphml(self.net, filename)
+
+    def export_sub_net(self, folder,filename2):
+        """Export the subnet to a graphml file
+
+        Args:
+            folder (string): Output folder
+        """
+        try:
+            os.mkdir(folder)
+        except:
+            pass
+        print("[+] Writing " + str(len(self.stream_list)) + " graphml subnet files to : " + folder)
+        filename = folder +filename2+ "l"
+        for i in range(0,len(self.sub_net)):
+            cur_out = filename + "_" + str(i) + ".graphml"
+            nx.write_graphml(self.sub_net[i], cur_out)
 
     def create_net(self):
         """Create the main network
@@ -162,7 +183,7 @@ class MultiLayerNetwork:
         """
         return self.net
     
-    def get_sub_net(self, layer=None):
+    def get_sub_net(self):
         """Return the list of subnetworks
 
         Args:
@@ -171,28 +192,28 @@ class MultiLayerNetwork:
         Returns:
             List NetworkX: The list of subnetworks
         """
-        #list of subnets (maybe to change function in multilayer class)
-        # s_len=len(self.stream_list)
-        # self.subNet =[]
-        # for i in range (0,s_len):
-        #     self.subNet.append(nx.subgraph_view(self.net, lambda : ))
-        # t=self.filter_edges(n)
-        # H = n.edge_subgraph(t)
-        # self.intergraph = H.to_undirected()
-        # return self.subNet, self.intergraph
-        pass
+        s_len=len(self.stream_list)
+        self.sub_net =[]
+        for i in range(0,s_len):
+            def filter(node, layer=i): return node[0]==layer
+            self.sub_net.append(nx.subgraph_view(self.net, filter_node=filter))
+        # self.intergraph = nx.subgraph_view(self.net, filter_edge=lambda edge: edge.inter).to_undirected()
+        return self.sub_net, self.intergraph
     
     
 
 if __name__ == "__main__" :
-    input_file_path = 'midis/bwv772.mid'  # Replace with your MIDI file path
+    input_file_path = 'midis/schubert_quartet.mid'  # Replace with your MIDI file path
     output_folder = 'results'  # Replace with your desired output folder
     
     # Create the MultiLayerNetwork object with the MIDI file and output folder
-    net1 = MultiLayerNetwork(input_file_path, output_folder, pitch=True, duration=False, offset=False, offset_period=4, octave=True)
+    net1 = MultiLayerNetwork(input_file_path, output_folder, pitch=False, duration=True, offset=True, offset_period=1, octave=False, Rest=False)
 
     # Call createNet function
     net1.create_net()
+
+    # Get the subnet and intergraph
+    net1.get_sub_net()
 
     # Derive the output filename from the input MIDI filename
     output_filename = os.path.splitext(os.path.basename(input_file_path))[0] + '.graphml'
@@ -209,5 +230,9 @@ if __name__ == "__main__" :
 
     # Export the multilayer network
     net1.export_net(os.path.join(subfolder_path, output_filename))
+
+    # Export subnets
+    net1.export_sub_net(os.path.join(output_folder, os.path.splitext(os.path.basename(input_file_path))[0]) + os.path.sep, os.path.splitext(os.path.basename(input_file_path))[0])
+
 
 ms.stream.iterator
