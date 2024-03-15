@@ -13,12 +13,7 @@ import json
 
 class MultiLayerNetwork:
     def __init__(self, midifilename, outfolder, **kwargs):
-        self.rest = self.get_param_or_default(kwargs, "rest", False)
-        self.octave = self.get_param_or_default(kwargs, "octave", False)
-        self.pitch = self.get_param_or_default(kwargs, "pitch", True)
-        self.duration = self.get_param_or_default(kwargs, "duration", False)
-        self.offset = self.get_param_or_default(kwargs, "offset", False)
-        self.offset_period = self.get_param_or_default(kwargs, "offset_period", 1)
+        self.get_params(**kwargs)
         self.net=nx.DiGraph()
         self.sub_net = []
         self.outfolder = outfolder
@@ -28,11 +23,29 @@ class MultiLayerNetwork:
         self.name = midifilename
         self.midi_file = midifilename
         whole_piece = ms.converter.parse(midifilename)
-        for part in whole_piece.parts: # loads each channel/instrument into stream list            
-            self.stream_list.append(part)
+        for part in whole_piece.parts: # loads each channel/instrument into stream list
+            if self.transpose:
+                self.stream_list.append(self.stream_to_C(part))
+            else :  
+                self.stream_list.append(part)
         for el in whole_piece.recurse():
             if 'Instrument' in el.classes:
                 self.instruments.append(str(el))
+
+    def get_params(self, **kwargs):
+        self.rest = self.get_param_or_default(kwargs, "rest", False)
+        self.octave = self.get_param_or_default(kwargs, "octave", False)
+        self.pitch = self.get_param_or_default(kwargs, "pitch", True)
+        self.duration = self.get_param_or_default(kwargs, "duration", False)
+        self.offset = self.get_param_or_default(kwargs, "offset", False)
+        self.offset_period = self.get_param_or_default(kwargs, "offset_period", 1)
+        self.transpose = self.get_param_or_default(kwargs, "transpose", False)
+
+    def stream_to_C(self, part):
+        k = part.flat.analyze('key')
+        i = ms.interval.Interval(k.tonic, ms.pitch.Pitch('C'))
+        part_transposed = part.transpose(i)
+        return part_transposed
 
     def get_param_or_default(self, param_dict, param, default):
         if param_dict.get(param) is None : return default
