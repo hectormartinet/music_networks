@@ -34,12 +34,14 @@ class MultiLayerNetwork:
 
     def get_params(self, **kwargs):
         self.rest = self.get_param_or_default(kwargs, "rest", False)
+        self.stop_at_unwanted = self.get_param_or_default(kwargs, "stop_at_unwanted", False)
         self.octave = self.get_param_or_default(kwargs, "octave", False)
         self.pitch = self.get_param_or_default(kwargs, "pitch", True)
         self.duration = self.get_param_or_default(kwargs, "duration", False)
         self.offset = self.get_param_or_default(kwargs, "offset", False)
         self.offset_period = self.get_param_or_default(kwargs, "offset_period", 1)
         self.transpose = self.get_param_or_default(kwargs, "transpose", False)
+        self.strict_link = self.get_param_or_default(kwargs, "strict_link", False)
 
     def stream_to_C(self, part):
         k = part.flat.analyze('key')
@@ -49,6 +51,7 @@ class MultiLayerNetwork:
 
     def get_param_or_default(self, param_dict, param, default):
         if param_dict.get(param) is None : return default
+        print("[+] Parameter " + str(param) + " set to "+ str(param_dict[param]))
         return param_dict[param]
 
     def is_buildable(self, elt):
@@ -113,7 +116,10 @@ class MultiLayerNetwork:
     def process_intra_layer(self, i, previous_node=None):
         s_flat = self.stream_list[i].flatten()
         for elt in s_flat.notesAndRests:
-            if not self.is_buildable(elt): continue
+            if not self.is_buildable(elt):
+                if self.stop_at_unwanted:
+                    previous_node = None
+                continue
             infos = self.parse_elt(elt, i)
             node = self.build_node(infos)
             self.add_or_update_node(node, infos)
@@ -129,7 +135,10 @@ class MultiLayerNetwork:
         for i in range(nb_notes):
             offset, duration, idx, node = all_nodes_infos[i]
             j = i+1
-            while  j<nb_notes and all_nodes_infos[j][0] < offset + duration:
+            for j in range(i+1,nb_notes):
+                offset2 = all_nodes_infos[j][0]
+                if (self.strict_link and offset2 > offset) or offset2 >= offset + duration:
+                    break
                 _, _, idx2, node2 = all_nodes_infos[j]
                 if idx != idx2:
                     # add undirected edge
@@ -216,11 +225,11 @@ class MultiLayerNetwork:
     
 
 if __name__ == "__main__" :
-    input_file_path = 'midis/schubert_quartet.mid'  # Replace with your MIDI file path
+    input_file_path = 'midis/bwv772.mid'  # Replace with your MIDI file path
     output_folder = 'results'  # Replace with your desired output folder
     
     # Create the MultiLayerNetwork object with the MIDI file and output folder
-    net1 = MultiLayerNetwork(input_file_path, output_folder, pitch=False, duration=True, offset=True, offset_period=1, octave=False, Rest=False)
+    net1 = MultiLayerNetwork(input_file_path, output_folder, pitch=False, duration=True, offset=True, offset_period=1, octave=False, rest=False, stop_at_unwanted=True, strict_link=True)
 
     # Call createNet function
     net1.create_net()
