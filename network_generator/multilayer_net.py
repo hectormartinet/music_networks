@@ -56,9 +56,13 @@ class MultiLayerNetwork:
                     node["pitch"] = elt.pitch.name
             if elt.isChord:
                 if self.octave:
-                    node["pitch"] = " ".join(list(set([str(pitch) for pitch in elt.pitches])))
+                    unique_notes = list(set([str(pitch) for pitch in elt.pitches]))
+                    unique_notes.sort(key=lambda elt : ms.pitch.Pitch(elt).midi)
+                    node["pitch"] = " ".join(unique_notes)
                 else:
-                    node["pitch"] = " ".join(list(set([pitch.name for pitch in elt.pitches])))
+                    unique_notes = list(set([str(pitch.name) for pitch in elt.pitches]))
+                    unique_notes.sort(key=lambda elt : ms.pitch.Pitch(elt).midi)
+                    node["pitch"] = " ".join(unique_notes)
         if self.duration:
             node["duration"] = elt.duration.quarterLength
         if self.offset:
@@ -144,11 +148,11 @@ class MultiLayerNetwork:
     
 
 if __name__ == "__main__" :
-    input_file_path = 'midis/schubert_quartet.mid'  # Replace with your MIDI file path
+    input_file_path = 'midis/bwv772.mid'  # Replace with your MIDI file path
     output_folder = 'results'  # Replace with your desired output folder
     
     # Create the MultiLayerNetwork object with the MIDI file and output folder
-    net1 = MultiLayerNetwork(input_file_path, output_folder, pitch=True, duration=False, offset=False, offset_period=4)
+    net1 = MultiLayerNetwork(input_file_path, output_folder, pitch=True, duration=False, offset=False, offset_period=4, octave=True)
 
     # Call createNet function
     net1.create_net()
