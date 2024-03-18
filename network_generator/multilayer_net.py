@@ -42,6 +42,7 @@ class MultiLayerNetwork:
         self.offset_period = self.get_param_or_default(kwargs, "offset_period", 1)
         self.transpose = self.get_param_or_default(kwargs, "transpose", False)
         self.strict_link = self.get_param_or_default(kwargs, "strict_link", False)
+        self.layer = self.get_param_or_default(kwargs, "layer", True)
 
     def stream_to_C(self, part):
         k = part.flat.analyze('key')
@@ -80,7 +81,9 @@ class MultiLayerNetwork:
             node["duration"] = infos["duration"]
         if self.offset:
             node["offset"] = infos["offset"]
-        return (infos["layer"],str(node))
+        if self.layer:
+            return (infos["layer"],str(node))
+        return str(node)
     
     def parse_pitch(self,elt):
         if elt.isNote:
@@ -107,10 +110,11 @@ class MultiLayerNetwork:
         pbar = tqdm(total=s_len)
 
         for i in range(s_len):  # For each instrument
-            last_note = self.process_intra_layer(i)
+            self.process_intra_layer(i if self.layer else 0)
             pbar.update(1)
-        print("[+] Creating network - Inter-layer processing")
-        self.process_inter_layer()
+        if self.layer:
+            print("[+] Creating network - Inter-layer processing")
+            self.process_inter_layer()
         return self.net
 
     def process_intra_layer(self, i, previous_node=None):
@@ -149,14 +153,27 @@ class MultiLayerNetwork:
     def add_or_update_node(self, node, infos):
         if not self.net.has_node(node):
             self.net.add_node(node, 
-                #weight=1, 
-                layer = infos["layer"], 
-                pitch = infos["pitch"],
-                duration = str(infos["duration"]),
-                offset = str(infos["offset"]),
-                #timestamps = [infos["timestamp"]],
-                rest = infos["rest"],
+                weight=1, 
+                layer = infos["layer"] if self.layer else [infos["layer"]], 
+                pitch = infos["pitch"] if self.pitch else [infos["pitch"]],
+                duration = float(infos["duration"]) if self.duration else [float(infos["duration"])],
+                offset = float(infos["offset"]) if self.offset else [float(infos["offset"])],
+                timestamps =[float(infos["timestamp"])],
+                rest = infos["rest"] if self.rest else [infos["rest"]],
             )
+        else :
+            self.net.nodes[node]["weight"] += 1
+            if not self.layer:
+                self.net.nodes[node]["layer"].append(infos["layer"])
+            if not self.pitch:
+                self.net.nodes[node]["pitch"].append(infos["pitch"])
+            if not self.duration:
+                self.net.nodes[node]["duration"].append(float(infos["duration"]))
+            if not self.offset:
+                self.net.nodes[node]["offset"].append(float(infos["offset"]))
+            self.net.nodes[node]["timestamps"].append(float(infos["timestamp"]))
+            if not self.rest:
+                self.net.nodes[node]["rest"].append(infos["rest"])
     
     def add_or_update_edge(self, from_node, to_node, inter):
         if from_node is None or to_node is None: return
@@ -164,6 +181,20 @@ class MultiLayerNetwork:
             self.net[from_node][to_node]["weight"] += 1
         else:
             self.net.add_edge(from_node, to_node, weight=1, inter=inter)
+
+    def convert_attributes_to_str(self):
+        for node in self.net.nodes:
+            if not self.layer:
+                self.net.nodes[node]["layer"] = str(self.net.nodes[node]["layer"])
+            if not self.pitch:
+                self.net.nodes[node]["pitch"] = str(self.net.nodes[node]["pitch"])
+            if not self.duration:
+                self.net.nodes[node]["duration"] = str(self.net.nodes[node]["duration"])
+            if not self.offset:
+                self.net.nodes[node]["offset"] = str(self.net.nodes[node]["offset"])
+            self.net.nodes[node]["timestamps"] = str(self.net.nodes[node]["timestamps"])
+            if not self.rest:
+                self.net.nodes[node]["rest"] = str(self.net.nodes[node]["rest"])
 
     def export_net(self, filename):
         """Export the network to a graphml file
@@ -196,6 +227,7 @@ class MultiLayerNetwork:
         """
         print("[+] Converting MIDI file to network")
         self.stream_to_network()
+        self.convert_attributes_to_str()
     
     def get_net(self):
         """Getter for the network
@@ -214,6 +246,8 @@ class MultiLayerNetwork:
         Returns:
             List NetworkX: The list of subnetworks
         """
+        if self.layer:
+            return self.net
         s_len=len(self.stream_list)
         self.sub_net =[]
         for i in range(0,s_len):
@@ -222,14 +256,16 @@ class MultiLayerNetwork:
         # self.intergraph = nx.subgraph_view(self.net, filter_edge=lambda edge: edge.inter).to_undirected()
         return self.sub_net, self.intergraph
     
+    def list_to_string(self,my_list):
+        return ','.join(str(x) for x in my_list)
     
 
 if __name__ == "__main__" :
-    input_file_path = 'midis/bwv772.mid'  # Replace with your MIDI file path
+    input_file_path = 'midis/invent1.mid'  # Replace with your MIDI file path
     output_folder = 'results'  # Replace with your desired output folder
     
     # Create the MultiLayerNetwork object with the MIDI file and output folder
-    net1 = MultiLayerNetwork(input_file_path, output_folder, pitch=False, duration=True, offset=True, offset_period=1, octave=False, rest=False, stop_at_unwanted=True, strict_link=True)
+    net1 = MultiLayerNetwork(input_file_path, output_folder, pitch=False, duration=True, offset=True, offset_period=1, octave=True, rest=True, stop_at_unwanted=True, layer=True)
 
     # Call createNet function
     net1.create_net()
@@ -250,11 +286,11 @@ if __name__ == "__main__" :
     if not os.path.exists(subfolder_path):
         os.makedirs(subfolder_path)
 
+    net1.convert_attributes_to_str()
+
     # Export the multilayer network
     net1.export_net(os.path.join(subfolder_path, output_filename))
 
     # Export subnets
     net1.export_sub_net(os.path.join(output_folder, os.path.splitext(os.path.basename(input_file_path))[0]) + os.path.sep, os.path.splitext(os.path.basename(input_file_path))[0])
 
-
-ms.stream.iterator
