@@ -43,6 +43,9 @@ class MultiLayerNetwork:
         self.transpose = self.get_param_or_default(kwargs, "transpose", False)
         self.strict_link = self.get_param_or_default(kwargs, "strict_link", False)
         self.layer = self.get_param_or_default(kwargs, "layer", True)
+        self.interval = self.get_param_or_default(kwargs, "interval", False)
+        self.diatonic = self.get_param_or_default(kwargs, "diatonic", False)
+        self.chromatic = not self.diatonic
 
     def stream_to_C(self, part):
         k = part.flat.analyze('key')
@@ -132,19 +135,22 @@ class MultiLayerNetwork:
     
     def process_inter_layer(self):
         s_len = len(self.stream_list)
-        all_nodes_infos = [(elt.offset, elt.quarterLength, idx, self.build_node(self.parse_elt(elt, idx))) for idx in range(s_len) 
+        all_nodes_infos = [self.parse_elt(elt, idx) for idx in range(s_len) 
             for elt in self.stream_list[idx].flatten().notesAndRests if self.is_buildable(elt)]
-        all_nodes_infos.sort(key=lambda x: x[0])
+        all_nodes_infos.sort(key=lambda x: x["offset"])
         nb_notes = len(all_nodes_infos)
         for i in range(nb_notes):
-            offset, duration, idx, node = all_nodes_infos[i]
-            j = i+1
+            offset = all_nodes_infos[i]["offset"]
+            duration = all_nodes_infos[i]["duration"]
+            layer = all_nodes_infos[i]["layer"]
+            node = self.build_node(all_nodes_infos[i])
             for j in range(i+1,nb_notes):
-                offset2 = all_nodes_infos[j][0]
+                offset2 = all_nodes_infos[j]["offset"]
                 if (self.strict_link and offset2 > offset) or offset2 >= offset + duration:
                     break
-                _, _, idx2, node2 = all_nodes_infos[j]
-                if idx != idx2:
+                layer2 = all_nodes_infos[j]["layer"]
+                node2 = self.build_node(all_nodes_infos[j])
+                if layer != layer2:
                     # add undirected edge
                     self.add_or_update_edge(node, node2, inter=True)
                     self.add_or_update_edge(node2, node, inter=True)
@@ -250,8 +256,8 @@ class MultiLayerNetwork:
             return self.net
         s_len=len(self.stream_list)
         self.sub_net =[]
-        for i in range(0,s_len):
-            def filter(node, layer=i): return node[0]==layer
+        for i in range(s_len):
+            def filter(node, layer=i): return node[0]==layer # use default arg to avoid dependancy on i
             self.sub_net.append(nx.subgraph_view(self.net, filter_node=filter))
         # self.intergraph = nx.subgraph_view(self.net, filter_edge=lambda edge: edge.inter).to_undirected()
         return self.sub_net, self.intergraph
