@@ -169,7 +169,8 @@ class MultiLayerNetwork:
             self.net.add_node(node, 
                 weight=1, 
                 layer = infos["layer"] if self.layer else [infos["layer"]], 
-                pitch = infos["pitch"] if self.pitch else [infos["pitch"]],
+                pitch = infos["pitch"] if self.pitch and self.octave else [infos["pitch"]],
+                pitch_class = infos["pitch_class"] if self.pitch else [infos["pitch_class"]],
                 duration = float(infos["duration"]) if self.duration else [float(infos["duration"])],
                 offset = float(infos["offset"]) if self.offset else [float(infos["offset"])],
                 timestamps =[float(infos["timestamp"])],
@@ -179,8 +180,10 @@ class MultiLayerNetwork:
             self.net.nodes[node]["weight"] += 1
             if not self.layer:
                 self.net.nodes[node]["layer"].append(infos["layer"])
-            if not self.pitch:
+            if not (self.pitch and self.octave):
                 self.net.nodes[node]["pitch"].append(infos["pitch"])
+            if not self.pitch:
+                self.net.nodes[node]["pitch_class"].append(infos["pitch_class"])
             if not self.duration:
                 self.net.nodes[node]["duration"].append(float(infos["duration"]))
             if not self.offset:
@@ -200,8 +203,10 @@ class MultiLayerNetwork:
         for node in self.net.nodes:
             if not self.layer:
                 self.net.nodes[node]["layer"] = str(self.net.nodes[node]["layer"])
-            if not self.pitch:
+            if not (self.pitch and self.octave):
                 self.net.nodes[node]["pitch"] = str(self.net.nodes[node]["pitch"])
+            if not self.pitch:
+                self.net.nodes[node]["pitch_class"] = str(self.net.nodes[node]["pitch_class"])
             if not self.duration:
                 self.net.nodes[node]["duration"] = str(self.net.nodes[node]["duration"])
             if not self.offset:
