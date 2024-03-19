@@ -137,16 +137,16 @@ class MultiLayerNetwork:
         s_len = len(self.stream_list)
         all_nodes_infos = [self.parse_elt(elt, idx) for idx in range(s_len) 
             for elt in self.stream_list[idx].flatten().notesAndRests if self.is_buildable(elt)]
-        all_nodes_infos.sort(key=lambda x: x["offset"])
+        all_nodes_infos.sort(key=lambda x: x["timestamp"])
         nb_notes = len(all_nodes_infos)
         for i in range(nb_notes):
-            offset = all_nodes_infos[i]["offset"]
+            timestamp = all_nodes_infos[i]["timestamp"]
             duration = all_nodes_infos[i]["duration"]
             layer = all_nodes_infos[i]["layer"]
             node = self.build_node(all_nodes_infos[i])
             for j in range(i+1,nb_notes):
-                offset2 = all_nodes_infos[j]["offset"]
-                if (self.strict_link and offset2 > offset) or offset2 >= offset + duration:
+                timestamp2 = all_nodes_infos[j]["timestamp"]
+                if (self.strict_link and timestamp2 > timestamp) or timestamp2 >= timestamp + duration:
                     break
                 layer2 = all_nodes_infos[j]["layer"]
                 node2 = self.build_node(all_nodes_infos[j])
