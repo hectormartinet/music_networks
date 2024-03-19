@@ -40,6 +40,7 @@ class MultiLayerNetwork:
         self.duration = self.get_param_or_default(kwargs, "duration", False)
         self.offset = self.get_param_or_default(kwargs, "offset", False)
         self.offset_period = self.get_param_or_default(kwargs, "offset_period", 1)
+        assert(self.offset_period > 0)
         self.transpose = self.get_param_or_default(kwargs, "transpose", False)
         self.strict_link = self.get_param_or_default(kwargs, "strict_link", False)
         self.layer = self.get_param_or_default(kwargs, "layer", True)
@@ -48,7 +49,7 @@ class MultiLayerNetwork:
         self.chromatic = not self.diatonic
 
     def stream_to_C(self, part):
-        k = part.flat.analyze('key')
+        k = part.flatten().analyze('key')
         i = ms.interval.Interval(k.tonic, ms.pitch.Pitch('C'))
         part_transposed = part.transpose(i)
         return part_transposed
@@ -72,6 +73,7 @@ class MultiLayerNetwork:
         infos["offset"] = elt.offset - self.offset_period*math.floor(elt.offset/self.offset_period)
         infos["timestamp"] = elt.offset
         infos["pitch"] = self.parse_pitch(elt)
+        infos["pitch_class"] = self.parse_pitch_class(elt)
         return infos
 
     def build_node(self, infos):
@@ -79,7 +81,10 @@ class MultiLayerNetwork:
         if self.rest:
             node["rest"] = infos["rest"]
         if self.pitch:
-            node["pitch"] = infos["pitch"]
+            if self.octave:
+                node["pitch"] = infos["pitch"]
+            else:
+                node["pitch"] = infos["pitch_class"]
         if self.duration:
             node["duration"] = infos["duration"]
         if self.offset:
@@ -90,19 +95,22 @@ class MultiLayerNetwork:
     
     def parse_pitch(self,elt):
         if elt.isNote:
-            if self.octave:
-                return str(elt.pitch)
-            else:
-                return elt.pitch.name
+            return str(elt.pitch)
         if elt.isChord:
-            if self.octave:
-                unique_notes = list(set([str(pitch) for pitch in elt.pitches]))
-                unique_notes.sort(key=lambda elt : ms.pitch.Pitch(elt).midi)
-                return " ".join(unique_notes)
-            else:
-                unique_notes = list(set([str(pitch.name) for pitch in elt.pitches]))
-                unique_notes.sort(key=lambda elt : ms.pitch.Pitch(elt).midi)
-                return " ".join(unique_notes)
+            unique_notes = list(set([str(pitch) for pitch in elt.pitches]))
+            unique_notes.sort(key=lambda elt : ms.pitch.Pitch(elt).midi)
+            return " ".join(unique_notes)
+        if elt.isRest:
+            return "rest"
+        assert(False)
+
+    def parse_pitch_class(self,elt):
+        if elt.isNote:
+            return elt.pitch.name
+        if elt.isChord:
+            unique_notes = list(set([str(pitch.name) for pitch in elt.pitches]))
+            unique_notes.sort(key=lambda elt : ms.pitch.Pitch(elt).midi)
+            return " ".join(unique_notes)
         if elt.isRest:
             return "rest"
         assert(False)
@@ -271,7 +279,7 @@ if __name__ == "__main__" :
     output_folder = 'results'  # Replace with your desired output folder
     
     # Create the MultiLayerNetwork object with the MIDI file and output folder
-    net1 = MultiLayerNetwork(input_file_path, output_folder, pitch=False, duration=True, offset=True, offset_period=1, octave=True, rest=True, stop_at_unwanted=True, layer=True)
+    net1 = MultiLayerNetwork(input_file_path, output_folder, pitch=True, duration=True, offset=True, offset_period=1, octave=True, rest=False, stop_at_unwanted=True, layer=True)
 
     # Call createNet function
     net1.create_net()
