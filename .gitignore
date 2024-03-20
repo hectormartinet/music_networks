@@ -5,4 +5,5 @@
 __pycache__/
 
 # Ignore output files
-2023_embeddings_2/
+results/
+tests_temp/
