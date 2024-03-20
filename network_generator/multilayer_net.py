@@ -11,11 +11,11 @@ import math
 # import random
 
 class MultiLayerNetwork:
-    def __init__(self, midifilename, outfolder, **kwargs):
+    def __init__(self, outfolder, midi_files, **kwargs):
         self.get_params(**kwargs)
         self.net=nx.DiGraph()
         self.outfolder = outfolder
-        self.load_new_midi(midifilename)
+        self.midi_files = midi_files if type(midi_files) is list else [midi_files]
 
     def load_new_midi(self, midifilename):
         self.sub_net = []
@@ -25,7 +25,7 @@ class MultiLayerNetwork:
         self.intergraph = None
         self.name = midifilename
         self.midi_file = midifilename
-        whole_piece = ms.converter.parse(midifilename)
+        whole_piece = ms.converter.parse(midifilename, quarterLengthDivisors = (16,))
         for part in whole_piece.parts: # loads each channel/instrument into stream list
             if self.transpose:
                 self.stream_list.append(self.stream_to_C(part))
@@ -279,9 +279,10 @@ class MultiLayerNetwork:
         """Create the main network
         """
         print("[+] Converting MIDI file to network")
-        self.stream_to_network()
-        self.convert_attributes_to_str()
-    
+        for midi in self.midi_files:
+            self.load_new_midi(midi)
+            self.stream_to_network()
+
     def get_net(self):
         """Getter for the network
 
@@ -314,11 +315,11 @@ class MultiLayerNetwork:
     
 
 if __name__ == "__main__" :
-    input_file_path = 'midis/invent8.mid'  # Replace with your MIDI file path
+    input_file_path = 'midis/invent4.mid'  # Replace with your MIDI file path
     output_folder = 'results'  # Replace with your desired output folder
     
     # Create the MultiLayerNetwork object with the MIDI file and output folder
-    net1 = MultiLayerNetwork(input_file_path, output_folder, pitch=False, duration=True, offset=True, offset_period=1, octave=False, rest=False, stop_at_unwanted=True, layer=True, interval=True, diatonic_interval=True)
+    net1 = MultiLayerNetwork(output_folder, input_file_path, transpose = True)
 
     # Call createNet function
     net1.create_net()
