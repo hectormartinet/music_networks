@@ -9,16 +9,19 @@ from tqdm import tqdm
 # import pyautogui
 import math
 # import random
-import json
 
 class MultiLayerNetwork:
     def __init__(self, midifilename, outfolder, **kwargs):
         self.get_params(**kwargs)
         self.net=nx.DiGraph()
-        self.sub_net = []
         self.outfolder = outfolder
-        self.stream_list=[]; self.negative_stream_list=[]
-        self.instruments=[]
+        self.load_new_midi(midifilename)
+
+    def load_new_midi(self, midifilename):
+        self.sub_net = []
+        self.stream_list = []
+        self.parsed_stream_list = []
+        self.instruments = []
         self.intergraph = None
         self.name = midifilename
         self.midi_file = midifilename
@@ -28,13 +31,14 @@ class MultiLayerNetwork:
                 self.stream_list.append(self.stream_to_C(part))
             else :  
                 self.stream_list.append(part)
-        for el in whole_piece.recurse():
-            if 'Instrument' in el.classes:
-                self.instruments.append(str(el))
+            self.parsed_stream_list = [self.build_parsed_list(part, i) for i,part in enumerate(self.stream_list)]
+        for elt in whole_piece.recurse():
+            if 'Instrument' in elt.classes:
+                self.instruments.append(str(elt))
 
     def get_params(self, **kwargs):
         self.rest = self.get_param_or_default(kwargs, "rest", False)
-        self.stop_at_unwanted = self.get_param_or_default(kwargs, "stop_at_unwanted", False)
+        self.stop_at_ignored = self.get_param_or_default(kwargs, "stop_at_unwanted", False)
         self.octave = self.get_param_or_default(kwargs, "octave", False)
         self.pitch = self.get_param_or_default(kwargs, "pitch", True)
         self.duration = self.get_param_or_default(kwargs, "duration", False)
@@ -45,8 +49,8 @@ class MultiLayerNetwork:
         self.strict_link = self.get_param_or_default(kwargs, "strict_link", False)
         self.layer = self.get_param_or_default(kwargs, "layer", True)
         self.interval = self.get_param_or_default(kwargs, "interval", False)
-        self.diatonic = self.get_param_or_default(kwargs, "diatonic", False)
-        self.chromatic = not self.diatonic
+        self.diatonic_interval = self.get_param_or_default(kwargs, "diatonic_interval", False)
+        self.chromatic_interval = not self.diatonic_interval
 
     def stream_to_C(self, part):
         k = part.flatten().analyze('key')
@@ -59,22 +63,41 @@ class MultiLayerNetwork:
         print("[+] Parameter " + str(param) + " set to "+ str(param_dict[param]))
         return param_dict[param]
 
-    def is_buildable(self, elt):
-        if elt.isRest and not self.rest :
-            return False
-        return True
+    def is_ignored(self, parsed_elt):
+        if not self.rest and parsed_elt["rest"]:
+            return True
+        if self.interval and parsed_elt["chord"]:
+            return True
+        return False
 
     def parse_elt(self, elt, i):
-        assert(self.is_buildable(elt))
         infos = {}
         infos["layer"] = i
         infos["rest"] = elt.isRest
+        infos["chord"] = elt.isChord
         infos["duration"] = elt.duration.quarterLength
         infos["offset"] = elt.offset - self.offset_period*math.floor(elt.offset/self.offset_period)
         infos["timestamp"] = elt.offset
         infos["pitch"] = self.parse_pitch(elt)
         infos["pitch_class"] = self.parse_pitch_class(elt)
         return infos
+
+    def build_parsed_list(self, part, i):
+        lst = [self.parse_elt(elt,i) for elt in part.flatten().notesAndRests]
+        if not self.stop_at_ignored :
+            lst = [elt for elt in lst if not self.is_ignored(elt)]
+        for i in range(len(lst)-1):
+            if lst[i]["rest"] or lst[i]["chord"] or lst[i+1]["rest"] or lst[i+1]["chord"]:
+                lst[i]["chromatic_interval"] = 0
+                lst[i]["diatonic_interval"] = 0
+                continue
+            interval = ms.interval.Interval(ms.pitch.Pitch(lst[i]["pitch"]), ms.pitch.Pitch(lst[i+1]["pitch"]))
+            lst[i]["diatonic_interval"] = interval.diatonic.generic.value
+            lst[i]["chromatic_interval"] = interval.chromatic.semitones
+        lst[len(lst)-1]["chromatic_interval"] = 0
+        lst[len(lst)-1]["diatonic_interval"] = 0
+        return lst
+
 
     def build_node(self, infos):
         node = {}
@@ -89,6 +112,8 @@ class MultiLayerNetwork:
             node["duration"] = infos["duration"]
         if self.offset:
             node["offset"] = infos["offset"]
+        if self.interval:
+            node["interval"] = infos["diatonic_interval"] if self.diatonic_interval else infos["chromatic_interval"]
         if self.layer:
             return (infos["layer"],str(node))
         return str(node)
@@ -129,22 +154,19 @@ class MultiLayerNetwork:
         return self.net
 
     def process_intra_layer(self, i, previous_node=None):
-        s_flat = self.stream_list[i].flatten()
-        for elt in s_flat.notesAndRests:
-            if not self.is_buildable(elt):
-                if self.stop_at_unwanted:
+        for parsed_elt in self.parsed_stream_list[i]:
+            if self.is_ignored(parsed_elt):
+                if self.stop_at_ignored:
                     previous_node = None
                 continue
-            infos = self.parse_elt(elt, i)
-            node = self.build_node(infos)
-            self.add_or_update_node(node, infos)
+            node = self.build_node(parsed_elt)
+            self.add_or_update_node(node, parsed_elt)
             self.add_or_update_edge(previous_node, node, inter=False)
             previous_node = node
     
     def process_inter_layer(self):
         s_len = len(self.stream_list)
-        all_nodes_infos = [self.parse_elt(elt, idx) for idx in range(s_len) 
-            for elt in self.stream_list[idx].flatten().notesAndRests if self.is_buildable(elt)]
+        all_nodes_infos = [elt for lst in self.parsed_stream_list for elt in lst if not self.is_ignored(elt)]
         all_nodes_infos.sort(key=lambda x: x["timestamp"])
         nb_notes = len(all_nodes_infos)
         for i in range(nb_notes):
@@ -166,17 +188,21 @@ class MultiLayerNetwork:
 
     def add_or_update_node(self, node, infos):
         if not self.net.has_node(node):
+            # TODO write a function to do the conditional list
             self.net.add_node(node, 
                 weight=1, 
                 layer = infos["layer"] if self.layer else [infos["layer"]], 
                 pitch = infos["pitch"] if self.pitch and self.octave else [infos["pitch"]],
                 pitch_class = infos["pitch_class"] if self.pitch else [infos["pitch_class"]],
+                chromatic_interval = infos["chromatic_interval"] if self.interval and self.chromatic_interval else [infos["chromatic_interval"]],
+                diatonic_interval = infos["diatonic_interval"] if self.interval and self.diatonic_interval else [infos["diatonic_interval"]],
                 duration = float(infos["duration"]) if self.duration else [float(infos["duration"])],
                 offset = float(infos["offset"]) if self.offset else [float(infos["offset"])],
                 timestamps =[float(infos["timestamp"])],
                 rest = infos["rest"] if self.rest else [infos["rest"]],
             )
         else :
+            # TODO write a function to avoid repetition
             self.net.nodes[node]["weight"] += 1
             if not self.layer:
                 self.net.nodes[node]["layer"].append(infos["layer"])
@@ -184,6 +210,10 @@ class MultiLayerNetwork:
                 self.net.nodes[node]["pitch"].append(infos["pitch"])
             if not self.pitch:
                 self.net.nodes[node]["pitch_class"].append(infos["pitch_class"])
+            if not (self.interval and self.chromatic_interval):
+                self.net.nodes[node]["chromatic_interval"].append(infos["chromatic_interval"])
+            if not (self.interval and self.diatonic_interval):
+                self.net.nodes[node]["diatonic_interval"].append(infos["diatonic_interval"])
             if not self.duration:
                 self.net.nodes[node]["duration"].append(float(infos["duration"]))
             if not self.offset:
@@ -207,6 +237,10 @@ class MultiLayerNetwork:
                 self.net.nodes[node]["pitch"] = str(self.net.nodes[node]["pitch"])
             if not self.pitch:
                 self.net.nodes[node]["pitch_class"] = str(self.net.nodes[node]["pitch_class"])
+            if not (self.interval and self.chromatic_interval):
+                self.net.nodes[node]["chromatic_interval"] = str(self.net.nodes[node]["chromatic_interval"])
+            if not (self.interval and self.diatonic_interval):
+                self.net.nodes[node]["diatonic_interval"] = str(self.net.nodes[node]["diatonic_interval"])
             if not self.duration:
                 self.net.nodes[node]["duration"] = str(self.net.nodes[node]["duration"])
             if not self.offset:
@@ -265,9 +299,9 @@ class MultiLayerNetwork:
         Returns:
             List NetworkX: The list of subnetworks
         """
-        if self.layer:
+        if not self.layer:
             return self.net
-        s_len=len(self.stream_list)
+        s_len = len(self.stream_list)
         self.sub_net =[]
         for i in range(s_len):
             def filter(node, layer=i): return node[0]==layer # use default arg to avoid dependancy on i
@@ -280,11 +314,11 @@ class MultiLayerNetwork:
     
 
 if __name__ == "__main__" :
-    input_file_path = 'midis/invent1.mid'  # Replace with your MIDI file path
+    input_file_path = 'midis/invent8.mid'  # Replace with your MIDI file path
     output_folder = 'results'  # Replace with your desired output folder
     
     # Create the MultiLayerNetwork object with the MIDI file and output folder
-    net1 = MultiLayerNetwork(input_file_path, output_folder, pitch=True, duration=True, offset=True, offset_period=1, octave=True, rest=False, stop_at_unwanted=True, layer=True)
+    net1 = MultiLayerNetwork(input_file_path, output_folder, pitch=False, duration=True, offset=True, offset_period=1, octave=False, rest=False, stop_at_unwanted=True, layer=True, interval=True, diatonic_interval=True)
 
     # Call createNet function
     net1.create_net()
