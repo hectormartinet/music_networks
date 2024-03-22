@@ -1,5 +1,6 @@
 import music21 as ms
 import networkx as nx
+import parameter_picker as par_pick
 # import pandas as pd
 # import numpy as np
 import os
@@ -11,11 +12,42 @@ import math
 # import random
 
 class MultiLayerNetwork:
-    def __init__(self, outfolder, midi_files, **kwargs):
-        self.get_params(**kwargs)
+    def __init__(self, default_outfolder, midi_files, use_gui=True, **kwargs):
+        params = self.get_params(**kwargs)
+        if use_gui:
+            params = self.pick_parameters(**params)
+        self.parse_params(**params)
         self.net=nx.DiGraph()
-        self.outfolder = outfolder
+        self.outfolder = default_outfolder
         self.midi_files = midi_files if type(midi_files) is list else [midi_files]
+
+    # def get_files(self, file_or_folder):
+    #     if file_or_folder.endswith("/")
+
+    def get_params(self, **kwargs):
+        default_params = {
+            "rest":False,
+            "stop_at_ignored":True,
+            "octave":False,
+            "pitch":True,
+            "duration":False,
+            "offset":False,
+            "offset_period":1.,
+            "transpose":False,
+            "strict_link":False,
+            "layer":True,
+            "interval":False,
+            "diatonic_interval":False,
+            "midi_folder_or_file":"midis/",
+            "outfolder":"results/"
+        }
+        for key in default_params.keys():
+            if key in kwargs:
+                default_params[key] = kwargs[key]
+        return default_params
+
+    def pick_parameters(self, **params):
+        return par_pick.get_parameters(**params)
 
     def load_new_midi(self, midifilename):
         self.sub_net = []
@@ -36,20 +68,20 @@ class MultiLayerNetwork:
             if 'Instrument' in elt.classes:
                 self.instruments.append(str(elt))
 
-    def get_params(self, **kwargs):
-        self.rest = self.get_param_or_default(kwargs, "rest", False)
-        self.stop_at_ignored = self.get_param_or_default(kwargs, "stop_at_unwanted", False)
-        self.octave = self.get_param_or_default(kwargs, "octave", False)
-        self.pitch = self.get_param_or_default(kwargs, "pitch", True)
-        self.duration = self.get_param_or_default(kwargs, "duration", False)
-        self.offset = self.get_param_or_default(kwargs, "offset", False)
-        self.offset_period = self.get_param_or_default(kwargs, "offset_period", 1)
+    def parse_params(self, **kwargs):
+        self.rest = kwargs["rest"]
+        self.stop_at_ignored = kwargs["stop_at_ignored"]
+        self.octave = kwargs["octave"]
+        self.pitch = kwargs["pitch"]
+        self.duration = kwargs["duration"]
+        self.offset = kwargs["offset"]
+        self.offset_period = kwargs["offset_period"]
         assert(self.offset_period > 0)
-        self.transpose = self.get_param_or_default(kwargs, "transpose", False)
-        self.strict_link = self.get_param_or_default(kwargs, "strict_link", False)
-        self.layer = self.get_param_or_default(kwargs, "layer", True)
-        self.interval = self.get_param_or_default(kwargs, "interval", False)
-        self.diatonic_interval = self.get_param_or_default(kwargs, "diatonic_interval", False)
+        self.transpose = kwargs["transpose"]
+        self.strict_link = kwargs["strict_link"]
+        self.layer = kwargs["layer"]
+        self.interval = kwargs["interval"]
+        self.diatonic_interval = kwargs["diatonic_interval"]
         self.chromatic_interval = not self.diatonic_interval
 
     def stream_to_C(self, part):
@@ -315,11 +347,11 @@ class MultiLayerNetwork:
     
 
 if __name__ == "__main__" :
-    input_file_path = 'midis/invent4.mid'  # Replace with your MIDI file path
+    input_file_path = 'midis/invent13.mid'  # Replace with your MIDI file path
     output_folder = 'results'  # Replace with your desired output folder
     
     # Create the MultiLayerNetwork object with the MIDI file and output folder
-    net1 = MultiLayerNetwork(output_folder, input_file_path, transpose = True)
+    net1 = MultiLayerNetwork(output_folder, input_file_path, use_gui=True, pitch=False)
 
     # Call createNet function
     net1.create_net()
