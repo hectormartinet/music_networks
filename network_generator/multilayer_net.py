@@ -20,9 +20,9 @@ class MultiLayerNetwork:
         self.net=nx.DiGraph()
         self.nodes_lists = []
 
-    def get_files(self, file_or_folder):
+    def get_files(self, file_or_folder, extension='.mid'):
         if file_or_folder.endswith("/"):
-            return [file_or_folder + file for file in os.listdir(file_or_folder)]
+            return [file_or_folder + file for file in os.listdir(file_or_folder) if os.path.splitext(file)[1]==extension]
         else:
             return [file_or_folder]
 
@@ -243,22 +243,21 @@ class MultiLayerNetwork:
                 rest = conditional_list(infos["rest"], self.rest),
             )
         else :
-            # TODO write a function to avoid repetition
             self.net.nodes[node]["weight"] += 1
-            def add_if_list(attribute, is_not_list, elt_to_add=None):
-                if not is_not_list:
+            def append_if_list(attribute, elt_to_add=None):
+                if type(self.net.nodes[node][attribute]) == list:
                     if elt_to_add is None:
                         self.net.nodes[node][attribute].append(infos[attribute])
                     else:
                         self.net.nodes[node][attribute].append(elt_to_add)
-            add_if_list("layer", self.layer)
-            add_if_list("pitch", self.pitch and self.octave)
-            add_if_list("pitch_class", self.pitch)
-            add_if_list("chromatic_interval", self.chromatic_interval)
-            add_if_list("diatonic_interval", self.diatonic_interval)
-            add_if_list("duration", self.duration, float(infos["duration"]))
-            add_if_list("offset", self.offset, float(infos["offset"]))
-            add_if_list("rest", self.rest)
+            append_if_list("layer")
+            append_if_list("pitch")
+            append_if_list("pitch_class")
+            append_if_list("chromatic_interval")
+            append_if_list("diatonic_interval")
+            append_if_list("duration",float(infos["duration"]))
+            append_if_list("offset", float(infos["offset"]))
+            append_if_list("rest")
             self.net.nodes[node]["timestamps"].append(float(infos["timestamp"]))
     
     def add_or_update_edge(self, from_node, to_node, inter):
@@ -269,24 +268,12 @@ class MultiLayerNetwork:
             self.net.add_edge(from_node, to_node, weight=1, inter=inter)
 
     def convert_attributes_to_str(self):
+        def convert_if_list(attribute, node):
+            if type(self.net.nodes[node][attribute]) == list :
+                self.net.nodes[node][attribute] = self.list_to_string(self.net.nodes[node][attribute])
         for node in self.net.nodes:
-            if not self.layer:
-                self.net.nodes[node]["layer"] = self.list_to_string(self.net.nodes[node]["layer"])
-            if not (self.pitch and self.octave):
-                self.net.nodes[node]["pitch"] = self.list_to_string(self.net.nodes[node]["pitch"])
-            if not self.pitch:
-                self.net.nodes[node]["pitch_class"] = self.list_to_string(self.net.nodes[node]["pitch_class"])
-            if not self.chromatic_interval:
-                self.net.nodes[node]["chromatic_interval"] = self.list_to_string(self.net.nodes[node]["chromatic_interval"])
-            if not self.diatonic_interval:
-                self.net.nodes[node]["diatonic_interval"] = self.list_to_string(self.net.nodes[node]["diatonic_interval"])
-            if not self.duration:
-                self.net.nodes[node]["duration"] = self.list_to_string(self.net.nodes[node]["duration"])
-            if not self.offset:
-                self.net.nodes[node]["offset"] = self.list_to_string(self.net.nodes[node]["offset"])
-            self.net.nodes[node]["timestamps"] = self.list_to_string(self.net.nodes[node]["timestamps"])
-            if not self.rest:
-                self.net.nodes[node]["rest"] = self.list_to_string(self.net.nodes[node]["rest"])
+            for attribute in self.net.nodes[node].keys():
+                convert_if_list(attribute, node)
 
     def export_net(self, filename):
         """Export the network to a graphml file
