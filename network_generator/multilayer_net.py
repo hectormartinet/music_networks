@@ -271,22 +271,22 @@ class MultiLayerNetwork:
     def convert_attributes_to_str(self):
         for node in self.net.nodes:
             if not self.layer:
-                self.net.nodes[node]["layer"] = str(self.net.nodes[node]["layer"])
+                self.net.nodes[node]["layer"] = self.list_to_string(self.net.nodes[node]["layer"])
             if not (self.pitch and self.octave):
-                self.net.nodes[node]["pitch"] = str(self.net.nodes[node]["pitch"])
+                self.net.nodes[node]["pitch"] = self.list_to_string(self.net.nodes[node]["pitch"])
             if not self.pitch:
-                self.net.nodes[node]["pitch_class"] = str(self.net.nodes[node]["pitch_class"])
+                self.net.nodes[node]["pitch_class"] = self.list_to_string(self.net.nodes[node]["pitch_class"])
             if not self.chromatic_interval:
-                self.net.nodes[node]["chromatic_interval"] = str(self.net.nodes[node]["chromatic_interval"])
+                self.net.nodes[node]["chromatic_interval"] = self.list_to_string(self.net.nodes[node]["chromatic_interval"])
             if not self.diatonic_interval:
-                self.net.nodes[node]["diatonic_interval"] = str(self.net.nodes[node]["diatonic_interval"])
+                self.net.nodes[node]["diatonic_interval"] = self.list_to_string(self.net.nodes[node]["diatonic_interval"])
             if not self.duration:
-                self.net.nodes[node]["duration"] = str(self.net.nodes[node]["duration"])
+                self.net.nodes[node]["duration"] = self.list_to_string(self.net.nodes[node]["duration"])
             if not self.offset:
-                self.net.nodes[node]["offset"] = str(self.net.nodes[node]["offset"])
-            self.net.nodes[node]["timestamps"] = str(self.net.nodes[node]["timestamps"])
+                self.net.nodes[node]["offset"] = self.list_to_string(self.net.nodes[node]["offset"])
+            self.net.nodes[node]["timestamps"] = self.list_to_string(self.net.nodes[node]["timestamps"])
             if not self.rest:
-                self.net.nodes[node]["rest"] = str(self.net.nodes[node]["rest"])
+                self.net.nodes[node]["rest"] = self.list_to_string(self.net.nodes[node]["rest"])
 
     def export_net(self, filename):
         """Export the network to a graphml file
@@ -298,7 +298,7 @@ class MultiLayerNetwork:
         print("[+] Writing main graphml file to : " + filename)
         nx.write_graphml(self.net, filename)
 
-    def export_sub_net(self, folder,filename2):
+    def export_sub_net(self, folder, filename):
         """Export the subnet to a graphml file
 
         Args:
@@ -309,7 +309,7 @@ class MultiLayerNetwork:
         except:
             pass
         print("[+] Writing " + str(len(self.stream_list)) + " graphml subnet files to : " + folder)
-        filename = folder +filename2+ "l"
+        filename = folder + filename + "l"
         for i in range(0,len(self.sub_net)):
             cur_out = filename + "_" + str(i) + ".graphml"
             nx.write_graphml(self.sub_net[i], cur_out)
@@ -357,7 +357,7 @@ class MultiLayerNetwork:
     
 
 if __name__ == "__main__" :
-    input_file_path = 'midis/invent13.mid'  # Replace with your MIDI file path
+    input_file_path = 'midis/invent_bach/'  # Replace with your MIDI file path
     output_folder = 'results/'  # Replace with your desired output folder
     
     # Create the MultiLayerNetwork object with the MIDI file and output folder
@@ -370,7 +370,10 @@ if __name__ == "__main__" :
     net1.get_sub_net()
 
     # Derive the output filename from the input MIDI filename
-    output_filename = os.path.splitext(os.path.basename(input_file_path))[0] + '.graphml'
+    if input_file_path.endswith("/"):
+        output_filename = os.path.dirname(input_file_path).split("/")[-1] + '.graphml'
+    else:
+        output_filename = os.path.splitext(os.path.basename(input_file_path))[0] + '.graphml'
 
     # Extract the name without extension
     name_without_extension = os.path.splitext(output_filename)[0]
@@ -388,5 +391,5 @@ if __name__ == "__main__" :
     net1.export_net(os.path.join(subfolder_path, output_filename))
 
     # Export subnets
-    net1.export_sub_net(os.path.join(output_folder, os.path.splitext(os.path.basename(input_file_path))[0]) + os.path.sep, os.path.splitext(os.path.basename(input_file_path))[0])
+    net1.export_sub_net(os.path.join(output_folder, name_without_extension) + os.path.sep, output_filename)
 
