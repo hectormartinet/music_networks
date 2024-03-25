@@ -17,7 +17,7 @@ class MultiLayerNetwork:
         if use_gui:
             params = self.pick_parameters(**params)
         self.parse_params(**params)
-        self.net=nx.DiGraph()
+        self.net = nx.DiGraph()
         self.nodes_lists = []
 
     def get_files(self, file_or_folder, extension='.mid'):
@@ -29,7 +29,6 @@ class MultiLayerNetwork:
     def get_params(self, **kwargs):
         default_params = {
             "rest":False,
-            "stop_at_ignored":True,
             "octave":False,
             "pitch":True,
             "duration":False,
@@ -37,6 +36,7 @@ class MultiLayerNetwork:
             "offset_period":1.,
             "transpose":False,
             "strict_link":False,
+            "max_link_time_diff":4.,
             "layer":True,
             "diatonic_interval":False,
             "chromatic_interval":False,
@@ -63,7 +63,7 @@ class MultiLayerNetwork:
         for part in whole_piece.parts: # loads each channel/instrument into stream list
             if self.transpose:
                 self.stream_list.append(self.stream_to_C(part))
-            else :  
+            else:
                 self.stream_list.append(part)
             self.parsed_stream_list = [self.build_parsed_list(part, i) for i,part in enumerate(self.stream_list)]
         for elt in whole_piece.recurse():
@@ -72,7 +72,6 @@ class MultiLayerNetwork:
 
     def parse_params(self, **params):
         self.rest = params["rest"]
-        self.stop_at_ignored = params["stop_at_ignored"]
         self.octave = params["octave"]
         self.pitch = params["pitch"]
         self.duration = params["duration"]
@@ -81,6 +80,7 @@ class MultiLayerNetwork:
         assert(self.offset_period > 0)
         self.transpose = params["transpose"]
         self.strict_link = params["strict_link"]
+        self.max_link_time_diff = params["max_link_time_diff"]
         self.layer = params["layer"]
         self.diatonic_interval = params["diatonic_interval"]
         self.chromatic_interval = params["chromatic_interval"]
@@ -101,10 +101,10 @@ class MultiLayerNetwork:
         print("[+] Parameter " + str(param) + " set to "+ str(param_dict[param]))
         return param_dict[param]
 
-    def is_ignored(self, parsed_elt):
-        if not self.rest and parsed_elt["rest"]:
+    def is_ignored(self, elt):
+        if not self.rest and elt.isRest:
             return True
-        if self.interval and parsed_elt["chord"]:
+        if self.interval and elt.isChord:
             return True
         return False
 
@@ -121,9 +121,7 @@ class MultiLayerNetwork:
         return infos
 
     def build_parsed_list(self, part, i):
-        lst = [self.parse_elt(elt,i) for elt in part.flatten().notesAndRests]
-        if not self.stop_at_ignored :
-            lst = [elt for elt in lst if not self.is_ignored(elt)]
+        lst = [self.parse_elt(elt,i) for elt in part.flatten().notesAndRests if not self.is_ignored(elt)]
         for i in range(len(lst)-1):
             if lst[i]["rest"] or lst[i]["chord"] or lst[i+1]["rest"] or lst[i+1]["chord"]:
                 lst[i]["chromatic_interval"] = 0
@@ -193,20 +191,22 @@ class MultiLayerNetwork:
             self.process_inter_layer()
         return self.net
 
-    def process_intra_layer(self, i, previous_node=None):
-        for parsed_elt in self.parsed_stream_list[i]:
-            if self.is_ignored(parsed_elt):
-                if self.stop_at_ignored:
-                    previous_node = None
-                continue
-            node = self.build_node(parsed_elt)
-            self.add_or_update_node(node, parsed_elt)
-            self.add_or_update_edge(previous_node, node, inter=False)
-            previous_node = node
+    def process_intra_layer(self, i, prev_elt=None):
+        prev_node = self.build_node(prev_elt) if prev_elt is not None else None
+        for elt in self.parsed_stream_list[i]:
+            if prev_elt is not None:
+                time_diff = elt["timestamp"] - prev_elt["timestamp"] - prev_elt["duration"]
+                if time_diff > self.max_link_time_diff:
+                    continue
+            node = self.build_node(elt)
+            self.add_or_update_node(node, elt)
+            self.add_or_update_edge(prev_node, node, inter=False)
+            prev_node = node
+            prev_elt = elt
     
     def process_inter_layer(self):
         s_len = len(self.stream_list)
-        all_nodes_infos = [elt for lst in self.parsed_stream_list for elt in lst if not self.is_ignored(elt)]
+        all_nodes_infos = [elt for lst in self.parsed_stream_list for elt in lst]
         all_nodes_infos.sort(key=lambda x: x["timestamp"])
         nb_notes = len(all_nodes_infos)
         for i in range(nb_notes):
@@ -268,12 +268,10 @@ class MultiLayerNetwork:
             self.net.add_edge(from_node, to_node, weight=1, inter=inter)
 
     def convert_attributes_to_str(self):
-        def convert_if_list(attribute, node):
-            if type(self.net.nodes[node][attribute]) == list :
-                self.net.nodes[node][attribute] = self.list_to_string(self.net.nodes[node][attribute])
         for node in self.net.nodes:
             for attribute in self.net.nodes[node].keys():
-                convert_if_list(attribute, node)
+                if type(self.net.nodes[node][attribute]) == list :
+                    self.net.nodes[node][attribute] = self.list_to_string(self.net.nodes[node][attribute])
 
     def export_net(self, filename):
         """Export the network to a graphml file
@@ -290,6 +288,7 @@ class MultiLayerNetwork:
 
         Args:
             folder (string): Output folder
+            filename (string): Output filename
         """
         try:
             os.mkdir(folder)
@@ -348,7 +347,7 @@ if __name__ == "__main__" :
     output_folder = 'results/'  # Replace with your desired output folder
     
     # Create the MultiLayerNetwork object with the MIDI file and output folder
-    net1 = MultiLayerNetwork(use_gui=True, output_folder = output_folder, midi_folder_or_file = input_file_path)
+    net1 = MultiLayerNetwork(use_gui=True, output_folder=output_folder, midi_folder_or_file=input_file_path)
 
     # Call createNet function
     net1.create_net()
@@ -379,4 +378,3 @@ if __name__ == "__main__" :
 
     # Export subnets
     net1.export_sub_net(os.path.join(output_folder, name_without_extension) + os.path.sep, output_filename)
-
