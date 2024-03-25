@@ -26,8 +26,8 @@ class MultiLayerNetwork:
             print(message)
 
     def get_files(self, file_or_folder, extension='.mid'):
-        if file_or_folder.endswith("/"):
-            return [file_or_folder + file for file in os.listdir(file_or_folder) if os.path.splitext(file)[1]==extension]
+        if os.path.isdir(file_or_folder):
+            return [file_or_folder + os.path.sep + file for file in os.listdir(file_or_folder) if os.path.splitext(file)[1]==extension]
         else:
             return [file_or_folder]
 
@@ -192,13 +192,12 @@ class MultiLayerNetwork:
     def process_intra_layer(self, i, prev_elt=None):
         prev_node = self.build_node(prev_elt) if prev_elt is not None else None
         for elt in self.parsed_stream_list[i]:
-            if prev_elt is not None:
-                time_diff = elt["timestamp"] - prev_elt["timestamp"] - prev_elt["duration"]
-                if time_diff > self.max_link_time_diff:
-                    continue
             node = self.build_node(elt)
             self.add_or_update_node(node, elt)
-            self.add_or_update_edge(prev_node, node, inter=False)
+            if prev_elt is not None:
+                time_diff = elt["timestamp"] - prev_elt["timestamp"] - prev_elt["duration"]
+                if time_diff <= self.max_link_time_diff:
+                    self.add_or_update_edge(prev_node, node, inter=False)
             prev_node = node
             prev_elt = elt
     
@@ -358,7 +357,7 @@ if __name__ == "__main__" :
     net1.get_sub_net()
 
     # Derive the output filename from the input MIDI filename
-    if input_file_path.endswith("/"):
+    if os.path.isdir(input_file_path):
         output_filename = os.path.dirname(input_file_path).split("/")[-1] + '.graphml'
     else:
         output_filename = os.path.splitext(os.path.basename(input_file_path))[0] + '.graphml'
