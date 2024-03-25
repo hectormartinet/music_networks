@@ -12,13 +12,18 @@ import math
 # import random
 
 class MultiLayerNetwork:
-    def __init__(self, use_gui=True, **kwargs):
+    def __init__(self, use_gui=True, verbosity=1,**kwargs):
         params = self.get_params(**kwargs)
         if use_gui:
             params = self.pick_parameters(**params)
         self.parse_params(**params)
+        self.verbosity = verbosity
         self.net = nx.DiGraph()
         self.nodes_lists = []
+
+    def print_if_useful(self, message, verbosity_level):
+        if verbosity_level <= self.verbosity:
+            print(message)
 
     def get_files(self, file_or_folder, extension='.mid'):
         if file_or_folder.endswith("/"):
@@ -95,11 +100,6 @@ class MultiLayerNetwork:
         i = ms.interval.Interval(k.tonic, ms.pitch.Pitch('C'))
         part_transposed = part.transpose(i)
         return part_transposed
-
-    def get_param_or_default(self, param_dict, param, default):
-        if param_dict.get(param) is None : return default
-        print("[+] Parameter " + str(param) + " set to "+ str(param_dict[param]))
-        return param_dict[param]
 
     def is_ignored(self, elt):
         if not self.rest and elt.isRest:
@@ -180,14 +180,12 @@ class MultiLayerNetwork:
     
     def stream_to_network(self):
         s_len = len(self.stream_list)
-        print("[+] Creating network - Intra-layer processing")
-        pbar = tqdm(total=s_len)
+        self.print_if_useful("[+] Creating network - Intra-layer processing", 2)
 
         for i in range(s_len):  # For each instrument
             self.process_intra_layer(i if self.layer else 0)
-            pbar.update(1)
-        if self.layer:
-            print("[+] Creating network - Inter-layer processing")
+        if self.layer and s_len > 1:
+            self.print_if_useful("[+] Creating network - Inter-layer processing", 2)
             self.process_inter_layer()
         return self.net
 
@@ -280,7 +278,7 @@ class MultiLayerNetwork:
             filename (string): Output filename
         """
 
-        print("[+] Writing main graphml file to : " + filename)
+        self.print_if_useful("[+] Writing main graphml file to : " + filename, 1)
         nx.write_graphml(self.net, filename)
 
     def export_sub_net(self, folder, filename):
@@ -294,7 +292,7 @@ class MultiLayerNetwork:
             os.mkdir(folder)
         except:
             pass
-        print("[+] Writing " + str(len(self.stream_list)) + " graphml subnet files to : " + folder)
+        self.print_if_useful("[+] Writing " + str(len(self.stream_list)) + " graphml subnet files to : " + folder, 1)
         filename = folder + filename + "l"
         for i in range(0,len(self.sub_net)):
             cur_out = filename + "_" + str(i) + ".graphml"
@@ -303,16 +301,19 @@ class MultiLayerNetwork:
     def create_net(self):
         """Create the main network
         """
-        print("[+] Converting MIDI file to network")
+        nb_files = len(self.midi_files)
+        self.print_if_useful("[+] Converting " + str(nb_files) + " MIDI file(s) to network", 1)
+        pbar = tqdm(total=nb_files)
         for midi in self.midi_files:
             self.load_new_midi(midi)
             self.stream_to_network()
+            pbar.update(1)
 
     def get_net(self):
         """Getter for the network
 
         Returns:
-            NetwrokX: The main network
+            NetworkX: The main network
         """
         return self.net
     
@@ -332,6 +333,7 @@ class MultiLayerNetwork:
         for i in range(s_len):
             def filter(node, layer=i): return node[0]==layer # use default arg to avoid dependancy on i
             self.sub_net.append(nx.subgraph_view(self.net, filter_node=filter))
+        # TODO make intergraph work
         # self.intergraph = nx.subgraph_view(self.net, filter_edge=lambda edge: edge.inter).to_undirected()
         return self.sub_net, self.intergraph
     
