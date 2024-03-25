@@ -21,7 +21,7 @@ class ParameterPicker(wx.Frame):
             if type(value) == float:
                 self.create_number_picker(key, value, ypos)
             ypos += self.interval
-        self.button = wx.Button(self.panel, -1, "Valider", (self.width-100, self.height-70))
+        self.button = wx.Button(self.panel, -1, "Confirm", (self.width-100, self.height-70))
         self.Bind(wx.EVT_BUTTON, self.save, self.button)
         
         self.Centre()
@@ -62,6 +62,6 @@ class ParameterPicker(wx.Frame):
 #---------------------------------------------------------------------------
 def get_parameters(**kwargs):
     app = wx.App(0)
-    picker = ParameterPicker(None, -1, 'wx.CheckBox',**kwargs)
+    picker = ParameterPicker(None, -1, 'Parameters',**kwargs)
     app.MainLoop()
     return picker.params

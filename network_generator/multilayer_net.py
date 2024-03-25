@@ -12,17 +12,19 @@ import math
 # import random
 
 class MultiLayerNetwork:
-    def __init__(self, default_outfolder, midi_files, use_gui=True, **kwargs):
+    def __init__(self, use_gui=True, **kwargs):
         params = self.get_params(**kwargs)
         if use_gui:
             params = self.pick_parameters(**params)
         self.parse_params(**params)
         self.net=nx.DiGraph()
-        self.outfolder = default_outfolder
-        self.midi_files = midi_files if type(midi_files) is list else [midi_files]
+        self.nodes_lists = []
 
-    # def get_files(self, file_or_folder):
-    #     if file_or_folder.endswith("/")
+    def get_files(self, file_or_folder):
+        if file_or_folder.endswith("/"):
+            return [file_or_folder + file for file in os.listdir(file_or_folder)]
+        else:
+            return [file_or_folder]
 
     def get_params(self, **kwargs):
         default_params = {
@@ -68,21 +70,24 @@ class MultiLayerNetwork:
             if 'Instrument' in elt.classes:
                 self.instruments.append(str(elt))
 
-    def parse_params(self, **kwargs):
-        self.rest = kwargs["rest"]
-        self.stop_at_ignored = kwargs["stop_at_ignored"]
-        self.octave = kwargs["octave"]
-        self.pitch = kwargs["pitch"]
-        self.duration = kwargs["duration"]
-        self.offset = kwargs["offset"]
-        self.offset_period = kwargs["offset_period"]
+    def parse_params(self, **params):
+        self.rest = params["rest"]
+        self.stop_at_ignored = params["stop_at_ignored"]
+        self.octave = params["octave"]
+        self.pitch = params["pitch"]
+        self.duration = params["duration"]
+        self.offset = params["offset"]
+        self.offset_period = params["offset_period"]
         assert(self.offset_period > 0)
-        self.transpose = kwargs["transpose"]
-        self.strict_link = kwargs["strict_link"]
-        self.layer = kwargs["layer"]
-        self.interval = kwargs["interval"]
-        self.diatonic_interval = kwargs["diatonic_interval"]
+        self.transpose = params["transpose"]
+        self.strict_link = params["strict_link"]
+        self.layer = params["layer"]
+        self.interval = params["interval"]
+        self.diatonic_interval = params["diatonic_interval"]
         self.chromatic_interval = not self.diatonic_interval
+        self.midi_files = self.get_files(params["midi_folder_or_file"])
+        self.outfolder = params["outfolder"]
+        
 
     def stream_to_C(self, part):
         k = part.flatten().analyze('key')
@@ -342,16 +347,19 @@ class MultiLayerNetwork:
         # self.intergraph = nx.subgraph_view(self.net, filter_edge=lambda edge: edge.inter).to_undirected()
         return self.sub_net, self.intergraph
     
+    def get_nodes_list(self, layer):
+        return [self.build_node(elt) for elt in self.parsed_stream_list[layer]]
+    
     def list_to_string(self,my_list):
         return ','.join(str(x) for x in my_list)
     
 
 if __name__ == "__main__" :
     input_file_path = 'midis/invent13.mid'  # Replace with your MIDI file path
-    output_folder = 'results'  # Replace with your desired output folder
+    output_folder = 'results/'  # Replace with your desired output folder
     
     # Create the MultiLayerNetwork object with the MIDI file and output folder
-    net1 = MultiLayerNetwork(output_folder, input_file_path, use_gui=True, pitch=False)
+    net1 = MultiLayerNetwork(use_gui=True, output_folder = output_folder, midi_folder_or_file = input_file_path)
 
     # Call createNet function
     net1.create_net()
