@@ -38,8 +38,8 @@ class MultiLayerNetwork:
             "transpose":False,
             "strict_link":False,
             "layer":True,
-            "interval":False,
             "diatonic_interval":False,
+            "chromatic_interval":False,
             "midi_folder_or_file":"midis/",
             "outfolder":"results/"
         }
@@ -82,12 +82,13 @@ class MultiLayerNetwork:
         self.transpose = params["transpose"]
         self.strict_link = params["strict_link"]
         self.layer = params["layer"]
-        self.interval = params["interval"]
         self.diatonic_interval = params["diatonic_interval"]
-        self.chromatic_interval = not self.diatonic_interval
+        self.chromatic_interval = params["chromatic_interval"]
         self.midi_files = self.get_files(params["midi_folder_or_file"])
         self.outfolder = params["outfolder"]
-        
+    
+    @property
+    def interval(self): return self.diatonic_interval or self.chromatic_interval
 
     def stream_to_C(self, part):
         k = part.flatten().analyze('key')
@@ -149,8 +150,10 @@ class MultiLayerNetwork:
             node["duration"] = infos["duration"]
         if self.offset:
             node["offset"] = infos["offset"]
-        if self.interval:
-            node["interval"] = infos["diatonic_interval"] if self.diatonic_interval else infos["chromatic_interval"]
+        if self.diatonic_interval:
+            node["diatonic_interval"] = infos["diatonic_interval"]
+        if self.chromatic_interval:
+            node["chromatic_interval"] = infos["chromatic_interval"]
         if self.layer:
             return (infos["layer"],str(node))
         return str(node)
@@ -231,8 +234,8 @@ class MultiLayerNetwork:
                 layer = infos["layer"] if self.layer else [infos["layer"]], 
                 pitch = infos["pitch"] if self.pitch and self.octave else [infos["pitch"]],
                 pitch_class = infos["pitch_class"] if self.pitch else [infos["pitch_class"]],
-                chromatic_interval = infos["chromatic_interval"] if self.interval and self.chromatic_interval else [infos["chromatic_interval"]],
-                diatonic_interval = infos["diatonic_interval"] if self.interval and self.diatonic_interval else [infos["diatonic_interval"]],
+                chromatic_interval = infos["chromatic_interval"] if self.chromatic_interval else [infos["chromatic_interval"]],
+                diatonic_interval = infos["diatonic_interval"] if self.diatonic_interval else [infos["diatonic_interval"]],
                 duration = float(infos["duration"]) if self.duration else [float(infos["duration"])],
                 offset = float(infos["offset"]) if self.offset else [float(infos["offset"])],
                 timestamps =[float(infos["timestamp"])],
@@ -247,9 +250,9 @@ class MultiLayerNetwork:
                 self.net.nodes[node]["pitch"].append(infos["pitch"])
             if not self.pitch:
                 self.net.nodes[node]["pitch_class"].append(infos["pitch_class"])
-            if not (self.interval and self.chromatic_interval):
+            if not self.chromatic_interval:
                 self.net.nodes[node]["chromatic_interval"].append(infos["chromatic_interval"])
-            if not (self.interval and self.diatonic_interval):
+            if not self.diatonic_interval:
                 self.net.nodes[node]["diatonic_interval"].append(infos["diatonic_interval"])
             if not self.duration:
                 self.net.nodes[node]["duration"].append(float(infos["duration"]))
@@ -274,9 +277,9 @@ class MultiLayerNetwork:
                 self.net.nodes[node]["pitch"] = str(self.net.nodes[node]["pitch"])
             if not self.pitch:
                 self.net.nodes[node]["pitch_class"] = str(self.net.nodes[node]["pitch_class"])
-            if not (self.interval and self.chromatic_interval):
+            if not self.chromatic_interval:
                 self.net.nodes[node]["chromatic_interval"] = str(self.net.nodes[node]["chromatic_interval"])
-            if not (self.interval and self.diatonic_interval):
+            if not self.diatonic_interval:
                 self.net.nodes[node]["diatonic_interval"] = str(self.net.nodes[node]["diatonic_interval"])
             if not self.duration:
                 self.net.nodes[node]["duration"] = str(self.net.nodes[node]["duration"])
