@@ -336,15 +336,20 @@ class MultiLayerNetwork:
         # self.intergraph = nx.subgraph_view(self.net, filter_edge=lambda edge: edge.inter).to_undirected()
         return self.sub_net, self.intergraph
     
-    def get_nodes_list(self, layer):
-        return [self.build_node(elt) for elt in self.parsed_stream_list[layer]]
+    def get_nodes_list(self, layer=0):
+        return [self.build_node(elt)[1] for elt in self.parsed_stream_list[layer]]
+    
+    def export_nodes_list(self, file, layer=0):
+        lst = self.get_nodes_list(layer)
+        open(file,"w").write("\n".join(lst))
+
     
     def list_to_string(self,my_list):
         return ','.join(str(x) for x in my_list)
     
 
 if __name__ == "__main__" :
-    input_file_path = 'midis/invent_bach/'  # Replace with your MIDI file path
+    input_file_path = 'midis/invent_bach/invent15.mid'  # Replace with your MIDI file path
     output_folder = 'results/'  # Replace with your desired output folder
     
     # Create the MultiLayerNetwork object with the MIDI file and output folder
@@ -379,3 +384,4 @@ if __name__ == "__main__" :
 
     # Export subnets
     net1.export_sub_net(os.path.join(output_folder, name_without_extension) + os.path.sep, output_filename)
+    net1.export_nodes_list("test.txt",0)
