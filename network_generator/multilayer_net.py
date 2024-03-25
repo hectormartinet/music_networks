@@ -228,39 +228,38 @@ class MultiLayerNetwork:
 
     def add_or_update_node(self, node, infos):
         if not self.net.has_node(node):
-            # TODO write a function to do the conditional list
+            def conditional_list(elt, no_list):
+                return elt if no_list else [elt]
             self.net.add_node(node, 
                 weight=1, 
-                layer = infos["layer"] if self.layer else [infos["layer"]], 
-                pitch = infos["pitch"] if self.pitch and self.octave else [infos["pitch"]],
-                pitch_class = infos["pitch_class"] if self.pitch else [infos["pitch_class"]],
-                chromatic_interval = infos["chromatic_interval"] if self.chromatic_interval else [infos["chromatic_interval"]],
-                diatonic_interval = infos["diatonic_interval"] if self.diatonic_interval else [infos["diatonic_interval"]],
-                duration = float(infos["duration"]) if self.duration else [float(infos["duration"])],
-                offset = float(infos["offset"]) if self.offset else [float(infos["offset"])],
+                layer = conditional_list(infos["layer"],self.layer), 
+                pitch = conditional_list(infos["pitch"], self.pitch and self.octave),
+                pitch_class = conditional_list(infos["pitch_class"], self.pitch),
+                chromatic_interval = conditional_list(infos["chromatic_interval"], self.chromatic_interval),
+                diatonic_interval = conditional_list(infos["diatonic_interval"], self.diatonic_interval),
+                duration = conditional_list(float(infos["duration"]), self.duration),
+                offset = conditional_list(float(infos["offset"]), self.offset),
                 timestamps =[float(infos["timestamp"])],
-                rest = infos["rest"] if self.rest else [infos["rest"]],
+                rest = conditional_list(infos["rest"], self.rest),
             )
         else :
             # TODO write a function to avoid repetition
             self.net.nodes[node]["weight"] += 1
-            if not self.layer:
-                self.net.nodes[node]["layer"].append(infos["layer"])
-            if not (self.pitch and self.octave):
-                self.net.nodes[node]["pitch"].append(infos["pitch"])
-            if not self.pitch:
-                self.net.nodes[node]["pitch_class"].append(infos["pitch_class"])
-            if not self.chromatic_interval:
-                self.net.nodes[node]["chromatic_interval"].append(infos["chromatic_interval"])
-            if not self.diatonic_interval:
-                self.net.nodes[node]["diatonic_interval"].append(infos["diatonic_interval"])
-            if not self.duration:
-                self.net.nodes[node]["duration"].append(float(infos["duration"]))
-            if not self.offset:
-                self.net.nodes[node]["offset"].append(float(infos["offset"]))
+            def add_if_list(attribute, is_not_list, elt_to_add=None):
+                if not is_not_list:
+                    if elt_to_add is None:
+                        self.net.nodes[node][attribute].append(infos[attribute])
+                    else:
+                        self.net.nodes[node][attribute].append(elt_to_add)
+            add_if_list("layer", self.layer)
+            add_if_list("pitch", self.pitch and self.octave)
+            add_if_list("pitch_class", self.pitch)
+            add_if_list("chromatic_interval", self.chromatic_interval)
+            add_if_list("diatonic_interval", self.diatonic_interval)
+            add_if_list("duration", self.duration, float(infos["duration"]))
+            add_if_list("offset", self.offset, float(infos["offset"]))
+            add_if_list("rest", self.rest)
             self.net.nodes[node]["timestamps"].append(float(infos["timestamp"]))
-            if not self.rest:
-                self.net.nodes[node]["rest"].append(infos["rest"])
     
     def add_or_update_edge(self, from_node, to_node, inter):
         if from_node is None or to_node is None: return
