@@ -33,18 +33,18 @@ class MultiLayerNetwork:
 
     def get_params(self, **kwargs):
         default_params = {
-            "rest":False,
-            "octave":False,
             "pitch":True,
+            "octave":False,
             "duration":False,
+            "rest":False,
             "offset":False,
             "offset_period":1.,
-            "transpose":False,
-            "strict_link":False,
-            "max_link_time_diff":4.,
-            "layer":True,
             "diatonic_interval":False,
             "chromatic_interval":False,
+            "transpose":False,
+            "layer":True,
+            "strict_link":False,
+            "max_link_time_diff":4.,
             "midi_folder_or_file":"midis/",
             "outfolder":"results/"
         }
@@ -54,7 +54,12 @@ class MultiLayerNetwork:
         return default_params
 
     def pick_parameters(self, **params):
-        return par_pick.get_parameters(**params)
+        hierarchy = {
+            "octave" : ("pitch",True),
+            "offset_period" : ("offset", True),
+            "strict_link" : ("layer", True),
+        }
+        return par_pick.get_parameters(params)
 
     def load_new_midi(self, midifilename):
         self.sub_net = []
@@ -77,8 +82,8 @@ class MultiLayerNetwork:
 
     def parse_params(self, **params):
         self.rest = params["rest"]
-        self.octave = params["octave"]
         self.pitch = params["pitch"]
+        self.octave = params["octave"]
         self.duration = params["duration"]
         self.offset = params["offset"]
         self.offset_period = params["offset_period"]
@@ -130,7 +135,7 @@ class MultiLayerNetwork:
             interval = ms.interval.Interval(ms.pitch.Pitch(lst[i]["pitch"]), ms.pitch.Pitch(lst[i+1]["pitch"]))
             lst[i]["diatonic_interval"] = interval.diatonic.generic.value
             lst[i]["chromatic_interval"] = interval.chromatic.semitones
-        lst[len(lst)-1]["chromatic_interval"] = 0
+        lst[len(lst)-1]["chromatic_interval"] = 0 # TODO Change default values...
         lst[len(lst)-1]["diatonic_interval"] = 0
         return lst
 
@@ -319,9 +324,6 @@ class MultiLayerNetwork:
     def get_sub_net(self):
         """Return the list of subnetworks
 
-        Args:
-            layer (Number of the layer, optional): Specify the layer to return. Defaults to None.
-
         Returns:
             List NetworkX: The list of subnetworks
         """
@@ -340,6 +342,13 @@ class MultiLayerNetwork:
         return [self.build_node(elt)[1] for elt in self.parsed_stream_list[layer]]
     
     def export_nodes_list(self, file, layer=0):
+        """Export the list of nodes in the order they are played in the song
+
+        Args:
+            file (str): Name of the output file
+            layer (int): index of the layer to export
+
+        """
         lst = self.get_nodes_list(layer)
         open(file,"w").write("\n".join(lst))
 
