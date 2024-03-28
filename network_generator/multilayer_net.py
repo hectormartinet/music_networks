@@ -15,7 +15,7 @@ class MultiLayerNetwork:
     def __init__(self, use_gui=True, verbosity=1,**kwargs):
         params = self.get_params(**kwargs)
         if use_gui:
-            params = self.pick_parameters(**params)
+            params = self.pick_parameters(params)
         self.parse_params(**params)
         self.verbosity = verbosity
         self.net = nx.DiGraph()
@@ -35,6 +35,7 @@ class MultiLayerNetwork:
         default_params = {
             "pitch":True,
             "octave":False,
+            "enharmony":False,
             "duration":False,
             "rest":False,
             "offset":False,
@@ -53,12 +54,7 @@ class MultiLayerNetwork:
                 default_params[key] = kwargs[key]
         return default_params
 
-    def pick_parameters(self, **params):
-        hierarchy = {
-            "octave" : ("pitch",True),
-            "offset_period" : ("offset", True),
-            "strict_link" : ("layer", True),
-        }
+    def pick_parameters(self, params):
         return par_pick.get_parameters(params)
 
     def load_new_midi(self, midifilename):
@@ -84,6 +80,7 @@ class MultiLayerNetwork:
         self.rest = params["rest"]
         self.pitch = params["pitch"]
         self.octave = params["octave"]
+        self.enharmony = params["enharmony"]
         self.duration = params["duration"]
         self.offset = params["offset"]
         self.offset_period = params["offset_period"]
@@ -139,7 +136,6 @@ class MultiLayerNetwork:
         lst[len(lst)-1]["diatonic_interval"] = 0
         return lst
 
-
     def build_node(self, infos):
         node = {}
         if self.rest:
@@ -161,7 +157,7 @@ class MultiLayerNetwork:
             return (infos["layer"],str(node))
         return str(node)
     
-    def parse_pitch(self,elt):
+    def parse_pitch(self, elt):
         if elt.isNote:
             return str(elt.pitch)
         if elt.isChord:
@@ -172,16 +168,22 @@ class MultiLayerNetwork:
             return "rest"
         assert(False)
 
-    def parse_pitch_class(self,elt):
+    def parse_pitch_class(self, elt):
         if elt.isNote:
-            return elt.pitch.name
+            return self.pitch_to_str(elt.pitch)
         if elt.isChord:
-            unique_notes = list(set([str(pitch.name) for pitch in elt.pitches]))
+            unique_notes = list(set([self.pitch_to_str(pitch) for pitch in elt.pitches]))
             unique_notes.sort(key=lambda elt : ms.pitch.Pitch(elt).midi)
             return " ".join(unique_notes)
         if elt.isRest:
             return "rest"
         assert(False)
+
+    def pitch_to_str(self, pitch):
+        if self.enharmony:
+            return str(ms.pitch.Pitch(pitch.midi))
+        else:
+            return str(pitch.name)
     
     def stream_to_network(self):
         s_len = len(self.stream_list)
@@ -358,7 +360,7 @@ class MultiLayerNetwork:
     
 
 if __name__ == "__main__" :
-    input_file_path = 'midis/invent_bach/invent15.mid'  # Replace with your MIDI file path
+    input_file_path = 'midis/test_pitches.mid'  # Replace with your MIDI file path
     output_folder = 'results/'  # Replace with your desired output folder
     
     # Create the MultiLayerNetwork object with the MIDI file and output folder
