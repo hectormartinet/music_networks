@@ -25,12 +25,6 @@ class MultiLayerNetwork:
         if verbosity_level <= self.verbosity:
             print(message)
 
-    def get_files(self, file_or_folder, extension='.mid'):
-        if os.path.isdir(file_or_folder):
-            return [file_or_folder + os.path.sep + file for file in os.listdir(file_or_folder) if os.path.splitext(file)[1]==extension]
-        else:
-            return [file_or_folder]
-
     def get_params(self, **kwargs):
         default_params = {
             "pitch":True,
@@ -46,7 +40,7 @@ class MultiLayerNetwork:
             "layer":True,
             "strict_link":False,
             "max_link_time_diff":4.,
-            "midi_folder_or_file":"midis/",
+            "midi_files":"midis/",
             "outfolder":"results/"
         }
         for key in default_params.keys():
@@ -91,7 +85,7 @@ class MultiLayerNetwork:
         self.layer = params["layer"]
         self.diatonic_interval = params["diatonic_interval"]
         self.chromatic_interval = params["chromatic_interval"]
-        self.midi_files = self.get_files(params["midi_folder_or_file"])
+        self.midi_files = params["midi_files"]
         self.outfolder = params["outfolder"]
     
     @property
@@ -364,7 +358,7 @@ if __name__ == "__main__" :
     output_folder = 'results/'  # Replace with your desired output folder
     
     # Create the MultiLayerNetwork object with the MIDI file and output folder
-    net1 = MultiLayerNetwork(use_gui=True, output_folder=output_folder, midi_folder_or_file=input_file_path)
+    net1 = MultiLayerNetwork(use_gui=True, output_folder=output_folder, midi_file=input_file_path)
 
     # Call createNet function
     net1.create_net()

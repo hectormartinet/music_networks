@@ -24,6 +24,8 @@ class ParameterPicker(wx.Frame):
                 self.create_folder_picker(param, value, ypos)
             elif w_type == "number_picker":
                 self.create_number_picker(param, value, ypos)
+            elif w_type == "file_picker":
+                self.create_file_picker(param, value, ypos)
             else:
                 print("Widget not recognized")
                 assert(False)
@@ -61,8 +63,20 @@ class ParameterPicker(wx.Frame):
             if dialog.ShowModal() == wx.ID_OK:
                 self.params[name] = dialog.GetPath()
                 text2.SetLabel(self.params[name])
-
         self.Bind(wx.EVT_BUTTON, save_folder, self.widgets["folder_picker"][name])
+    
+    def create_file_picker(self, name, default, ypos):
+        text1 = wx.StaticText(self.panel, -1, name, (10, ypos))
+        size = text1.GetSize().x
+        self.widgets["file_picker"][name] = wx.Button(self.panel, -1, "search", (15+size, ypos-4))
+        size += self.widgets["file_picker"][name].GetSize().x
+        text2 = wx.StaticText(self.panel, -1, default, (20+size, ypos))
+        def save_folder(event):
+            dialog = wx.FileDialog(None, "Choose a file:",style=wx.DD_DEFAULT_STYLE | wx.FD_MULTIPLE)
+            if dialog.ShowModal() == wx.ID_OK:
+                self.params[name] = dialog.GetPaths()
+                text2.SetLabel(",".join(self.params[name]))
+        self.Bind(wx.EVT_BUTTON, save_folder, self.widgets["file_picker"][name])
     
     def create_number_picker(self, name, default, ypos):
         centeredLabel = wx.StaticText(self.panel, -1, name, (10,ypos))
@@ -94,7 +108,7 @@ def get_parameters(default_params):
         "layer":"checkbox",
         "diatonic_interval":"checkbox",
         "chromatic_interval":"checkbox",
-        "midi_folder_or_file":"folder_picker",
+        "midi_files":"file_picker",
         "outfolder":"folder_picker"
     }
     # parent_parameters:[(child_parameter, required_value),...]
