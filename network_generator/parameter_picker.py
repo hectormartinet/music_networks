@@ -3,11 +3,11 @@ import random
 
 class ParameterPicker(wx.Frame):
     def __init__(self, parent, id, title, widgets_type, default_params, dependancy={}):
+        self.interval = 27
         self.width = 500
-        self.height = 500
+        self.height = self.interval*(len(default_params)+3)
         wx.Frame.__init__(self, parent, id, title, size=(self.width, self.height))
         self.panel = wx.Panel(self, -1)
-        self.interval = 27
         self.checkbox = {}
         self.folder_pickers = {}
         self.number_pickers = {}
@@ -28,17 +28,16 @@ class ParameterPicker(wx.Frame):
                 print("Widget not recognized")
                 assert(False)
             ypos += self.interval
-        for child_param, values_to_unpack in dependancy.items():
-            parent_param, value = values_to_unpack
-            child_type = widgets_type[child_param]
+        for parent_param, param_and_value_list in dependancy.items():
             parent_type = widgets_type[parent_param]
-            def auto_activation(event, 
-                child_widget=self.widgets[child_type][child_param], value = value,
-                parent_widget=self.widgets[parent_type][parent_param]):
-                if parent_widget.GetValue() == value:
-                    child_widget.Enable()
-                else:
-                    child_widget.Disable()
+            def auto_activation(event, lst=param_and_value_list, parent_widget=self.widgets[parent_type][parent_param]):
+                for child_param, value in lst:
+                    child_type = widgets_type[child_param]
+                    child_widget = self.widgets[child_type][child_param]
+                    if parent_widget.GetValue() == value:
+                        child_widget.Enable()
+                    else:
+                        child_widget.Disable()
             self.Bind(wx.EVT_CHECKBOX, auto_activation, self.widgets[parent_type][parent_param])
             auto_activation(None)
         self.button = wx.Button(self.panel, -1, "Confirm", (self.width-100, self.height-70))
@@ -84,6 +83,7 @@ def get_parameters(default_params):
     widgets_type = {
         "rest":"checkbox",
         "octave":"checkbox",
+        "enharmony":"checkbox",
         "pitch":"checkbox",
         "duration":"checkbox",
         "offset":"checkbox",
@@ -97,10 +97,11 @@ def get_parameters(default_params):
         "midi_folder_or_file":"folder_picker",
         "outfolder":"folder_picker"
     }
+    # parent_parameters:[(child_parameter, required_value),...]
     dependancy = {
-        "octave": ("pitch", True),
-        "offset_period": ("offset", True),
-        "strict_link": ("layer",True)
+        "pitch": [("octave",True),("enharmony",True)],
+        "offset": [("offset_period", True)],
+        "layer": [("strict_link",True)]
     }
     app = wx.App(0)
     picker = ParameterPicker(None, -1, 'Parameters', widgets_type, default_params, dependancy)
