@@ -29,18 +29,19 @@ class MultiLayerNetwork:
         default_params = {
             "pitch":True,
             "octave":False,
-            "enharmony":False,
             "duration":False,
             "rest":False,
             "offset":False,
             "offset_period":1.,
+            "enharmony":True,
             "diatonic_interval":False,
             "chromatic_interval":False,
             "transpose":False,
+            "flatten":False,
             "layer":True,
             "strict_link":False,
             "max_link_time_diff":4.,
-            "midi_files":"midis/",
+            "midi_files":["midis/invent_bach/invent1.mid"],
             "outfolder":"results/"
         }
         for key in default_params.keys():
@@ -60,15 +61,23 @@ class MultiLayerNetwork:
         self.name = midifilename
         self.midi_file = midifilename
         whole_piece = ms.converter.parse(midifilename, quarterLengthDivisors = (16,))
-        for part in whole_piece.parts: # loads each channel/instrument into stream list
+        if self.flatten:
+            whole_piece = whole_piece.chordify()
             if self.transpose:
-                self.stream_list.append(self.stream_to_C(part))
+                self.stream_list.append(self.stream_to_C(whole_piece))
             else:
-                self.stream_list.append(part)
-            self.parsed_stream_list = [self.build_parsed_list(part, i) for i,part in enumerate(self.stream_list)]
-        for elt in whole_piece.recurse():
-            if 'Instrument' in elt.classes:
-                self.instruments.append(str(elt))
+                self.stream_list.append(whole_piece)
+            self.parsed_stream_list = [self.build_parsed_list(whole_piece, 0)]
+        else:
+            for part in whole_piece.parts: # loads each channel/instrument into stream list
+                if self.transpose:
+                    self.stream_list.append(self.stream_to_C(part))
+                else:
+                    self.stream_list.append(part)
+                self.parsed_stream_list = [self.build_parsed_list(part, i) for i,part in enumerate(self.stream_list)]
+            for elt in whole_piece.recurse():
+                if 'Instrument' in elt.classes:
+                    self.instruments.append(str(elt))
 
     def parse_params(self, **params):
         self.rest = params["rest"]
@@ -83,7 +92,12 @@ class MultiLayerNetwork:
         self.strict_link = params["strict_link"]
         self.max_link_time_diff = params["max_link_time_diff"]
         self.layer = params["layer"]
+        self.flatten = params["flatten"]
+        if self.flatten:
+            self.layer = False
         self.diatonic_interval = params["diatonic_interval"]
+        if self.enharmony:
+            self.diatonic_interval = False
         self.chromatic_interval = params["chromatic_interval"]
         self.midi_files = params["midi_files"]
         self.outfolder = params["outfolder"]
@@ -92,10 +106,14 @@ class MultiLayerNetwork:
     def interval(self): return self.diatonic_interval or self.chromatic_interval
 
     def stream_to_C(self, part):
-        k = part.flatten().analyze('key')
-        i = ms.interval.Interval(k.tonic, ms.pitch.Pitch('C'))
-        part_transposed = part.transpose(i)
-        return part_transposed
+        key = part.flatten().analyze('key')
+        if key.mode == "major":
+            i = ms.interval.Interval(key.tonic, ms.pitch.Pitch('C'))
+        elif key.mode == "minor":
+            i = ms.interval.Interval(key.tonic, ms.pitch.Pitch('A'))
+        else:
+            assert(False)
+        return part.transpose(i)
 
     def is_ignored(self, elt):
         if not self.rest and elt.isRest:
@@ -358,7 +376,7 @@ if __name__ == "__main__" :
     output_folder = 'results/'  # Replace with your desired output folder
     
     # Create the MultiLayerNetwork object with the MIDI file and output folder
-    net1 = MultiLayerNetwork(use_gui=True, output_folder=output_folder, midi_file=input_file_path)
+    net1 = MultiLayerNetwork(use_gui=True, output_folder=output_folder)
 
     # Call createNet function
     net1.create_net()

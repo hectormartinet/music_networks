@@ -70,7 +70,7 @@ class ParameterPicker(wx.Frame):
         size = text1.GetSize().x
         self.widgets["file_picker"][name] = wx.Button(self.panel, -1, "search", (15+size, ypos-4))
         size += self.widgets["file_picker"][name].GetSize().x
-        text2 = wx.StaticText(self.panel, -1, default, (20+size, ypos))
+        text2 = wx.StaticText(self.panel, -1, ",".join(default), (20+size, ypos))
         def save_folder(event):
             dialog = wx.FileDialog(None, "Choose a file:",style=wx.DD_DEFAULT_STYLE | wx.FD_MULTIPLE)
             if dialog.ShowModal() == wx.ID_OK:
@@ -82,9 +82,13 @@ class ParameterPicker(wx.Frame):
         centeredLabel = wx.StaticText(self.panel, -1, name, (10,ypos))
         size = centeredLabel.GetSize().x
 
-        mlTextCtrl = wx.TextCtrl(self.panel, -1, str(default), (15+size, ypos-3))
-        self.widgets["number_picker"][name] = mlTextCtrl
+        self.widgets["number_picker"][name] = wx.TextCtrl(self.panel, -1, str(default), (15+size, ypos-3))
     
+    def create_choice(self, name, values, default, ypos):
+        self.widgets["choice"][name] = wx.Choice(self.panel, -1, (10,ypos), choices = values, name=name)
+        n = values.index(default)
+        self.widgets["choice"][name].SetSelection(n)
+
     def save(self, event):
         for key, checkbox in self.widgets["checkbox"].items():
             self.params[key] = checkbox.GetValue()
@@ -106,16 +110,20 @@ def get_parameters(default_params):
         "strict_link":"checkbox",
         "max_link_time_diff":"number_picker",
         "layer":"checkbox",
+        "flatten":"checkbox",
         "diatonic_interval":"checkbox",
         "chromatic_interval":"checkbox",
         "midi_files":"file_picker",
         "outfolder":"folder_picker"
     }
+
     # parent_parameters:[(child_parameter, required_value),...]
+    # Some parameters are only usefull when an other has a specific value
     dependancy = {
         "pitch": [("octave",True),("enharmony",True)],
         "offset": [("offset_period", True)],
-        "layer": [("strict_link",True)]
+        "layer": [("strict_link",True)],
+        "enharmony":[("diatonic_interval", False)]
     }
     app = wx.App(0)
     picker = ParameterPicker(None, -1, 'Parameters', widgets_type, default_params, dependancy)
