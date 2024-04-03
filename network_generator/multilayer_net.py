@@ -61,6 +61,7 @@ class MultiLayerNetwork:
         self.name = midifilename
         self.midi_file = midifilename
         whole_piece = ms.converter.parse(midifilename, quarterLengthDivisors = (16,))
+        self.key = whole_piece.flatten().analyze('key')
         if self.flatten:
             whole_piece = whole_piece.chordify()
             if self.transpose:
@@ -106,11 +107,10 @@ class MultiLayerNetwork:
     def interval(self): return self.diatonic_interval or self.chromatic_interval
 
     def stream_to_C(self, part):
-        key = part.flatten().analyze('key')
-        if key.mode == "major":
-            i = ms.interval.Interval(key.tonic, ms.pitch.Pitch('C'))
-        elif key.mode == "minor":
-            i = ms.interval.Interval(key.tonic, ms.pitch.Pitch('A'))
+        if self.key.mode == "major":
+            i = ms.interval.Interval(self.key.tonic, ms.pitch.Pitch('C'))
+        elif self.key.mode == "minor":
+            i = ms.interval.Interval(self.key.tonic, ms.pitch.Pitch('A'))
         else:
             assert(False)
         return part.transpose(i)
