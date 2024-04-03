@@ -113,6 +113,7 @@ def get_parameters(default_params):
         "flatten":"checkbox",
         "diatonic_interval":"checkbox",
         "chromatic_interval":"checkbox",
+        "chord_function":"checkbox",
         "midi_files":"file_picker",
         "outfolder":"folder_picker"
     }

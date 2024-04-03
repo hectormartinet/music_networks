@@ -36,6 +36,7 @@ class MultiLayerNetwork:
             "enharmony":True,
             "diatonic_interval":False,
             "chromatic_interval":False,
+            "chord_function":False,
             "transpose":False,
             "flatten":False,
             "layer":True,
@@ -61,7 +62,8 @@ class MultiLayerNetwork:
         self.name = midifilename
         self.midi_file = midifilename
         whole_piece = ms.converter.parse(midifilename, quarterLengthDivisors = (16,))
-        self.key = whole_piece.flatten().analyze('key')
+        self.original_key = whole_piece.flatten().analyze('key')
+        self.key = self.original_key
         if self.flatten:
             whole_piece = whole_piece.chordify()
             if self.transpose:
@@ -100,6 +102,7 @@ class MultiLayerNetwork:
         if self.enharmony:
             self.diatonic_interval = False
         self.chromatic_interval = params["chromatic_interval"]
+        self.chord_function = params["chord_function"]
         self.midi_files = params["midi_files"]
         self.outfolder = params["outfolder"]
     
@@ -107,10 +110,12 @@ class MultiLayerNetwork:
     def interval(self): return self.diatonic_interval or self.chromatic_interval
 
     def stream_to_C(self, part):
-        if self.key.mode == "major":
-            i = ms.interval.Interval(self.key.tonic, ms.pitch.Pitch('C'))
-        elif self.key.mode == "minor":
-            i = ms.interval.Interval(self.key.tonic, ms.pitch.Pitch('A'))
+        if self.original_key.mode == "major":
+            i = ms.interval.Interval(self.original_key.tonic, ms.pitch.Pitch('C'))
+            self.key = ms.key.Key("C")
+        elif self.original_key.mode == "minor":
+            i = ms.interval.Interval(self.original_key.tonic, ms.pitch.Pitch('A'))
+            self.key = ms.key.Key("a")
         else:
             assert(False)
         return part.transpose(i)
@@ -132,6 +137,7 @@ class MultiLayerNetwork:
         infos["timestamp"] = elt.offset
         infos["pitch"] = self.parse_pitch(elt)
         infos["pitch_class"] = self.parse_pitch_class(elt)
+        infos["chord_function"] = ms.roman.romanNumeralFromChord(elt,self.key).figure if elt.isChord else "N/A"
         return infos
 
     def build_parsed_list(self, part, i):
@@ -167,6 +173,8 @@ class MultiLayerNetwork:
             node["chromatic_interval"] = infos["chromatic_interval"]
         if self.layer:
             return (infos["layer"],str(node))
+        if self.chord_function:
+            return infos["chord_function"]
         return str(node)
     
     def parse_pitch(self, elt):
@@ -257,6 +265,7 @@ class MultiLayerNetwork:
                 offset = conditional_list(float(infos["offset"]), self.offset),
                 timestamps =[float(infos["timestamp"])],
                 rest = conditional_list(infos["rest"], self.rest),
+                chord_function = conditional_list(infos["chord_function"], self.chord_function)
             )
         else :
             self.net.nodes[node]["weight"] += 1
@@ -274,6 +283,7 @@ class MultiLayerNetwork:
             append_if_list("duration",float(infos["duration"]))
             append_if_list("offset", float(infos["offset"]))
             append_if_list("rest")
+            append_if_list("chord_function")
             self.net.nodes[node]["timestamps"].append(float(infos["timestamp"]))
     
     def add_or_update_edge(self, from_node, to_node, inter):
@@ -353,7 +363,10 @@ class MultiLayerNetwork:
         return self.sub_net, self.intergraph
     
     def get_nodes_list(self, layer=0):
-        return [self.build_node(elt)[1] for elt in self.parsed_stream_list[layer]]
+        if self.layer:
+            return [self.build_node(elt)[1] for elt in self.parsed_stream_list[layer]]
+        else:
+            return [self.build_node(elt) for elt in self.parsed_stream_list[0]]
     
     def export_nodes_list(self, file, layer=0):
         """Export the list of nodes in the order they are played in the song
