@@ -114,6 +114,7 @@ def get_parameters(default_params):
         "diatonic_interval":"checkbox",
         "chromatic_interval":"checkbox",
         "chord_function":"checkbox",
+        "group_by_beat":"checkbox",
         "midi_files":"file_picker",
         "outfolder":"folder_picker"
     }

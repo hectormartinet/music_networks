@@ -46,6 +46,7 @@ class MultiLayerNetwork:
             "layer":True,
             "strict_link":False,
             "max_link_time_diff":4.,
+            "group_by_beat":False,
             "midi_files":["midis/invent_bach/invent1.mid"],
             "outfolder":"results/"
         }
@@ -104,7 +105,7 @@ class MultiLayerNetwork:
         self.diatonic_interval = params["diatonic_interval"] and not self.enharmony
         self.chromatic_interval = params["chromatic_interval"]
         self.chord_function = params["chord_function"]
-        self.group_by_beat = True
+        self.group_by_beat = params["group_by_beat"]
         self.midi_files = params["midi_files"]
         for file_name in self.midi_files:
             assert(os.path.splitext(file_name)[1] in [".mid", ".mscz"])
