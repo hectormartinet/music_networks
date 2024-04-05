@@ -9,21 +9,38 @@ def rand_bool():
 def randomize_args():
     args = {}
     args["rest"] = rand_bool()
-    args["stop_at_unwanted"] = rand_bool()
     args["octave"] = rand_bool()
     args["pitch"] = rand_bool()
     args["duration"] = rand_bool()
     args["offset"] = rand_bool()
+    args["enharmony"] = rand_bool()
     args["offset_period"] = rd.randint(1,16)/4
     args["transpose"] = rand_bool()
     args["strict_link"] = rand_bool()
     args["layer"] = rand_bool()
-    args["interval"] = rand_bool()
-    args["diatonic"] = rand_bool()
+    args["flatten"] = rand_bool()
+    args["chromatic_interval"] = rand_bool()
+    args["diatonic_interval"] = rand_bool()
+    args["max_link_time_diff"] = rd.randint(1,16)/4
+            # "pitch":True,
+            # "octave":False,
+            # "duration":False,
+            # "rest":False,
+            # "offset":False,
+            # "offset_period":1.,
+            # "enharmony":True,
+            # "diatonic_interval":False,
+            # "chromatic_interval":False,
+            # "chord_function":False,
+            # "transpose":False,
+            # "flatten":False,
+            # "layer":True,
+            # "strict_link":False,
+            # "max_link_time_diff":4.,
     return args
 
 if __name__ == "__main__" :
-    input_file_path = 'midis/invent1.mid'  # Replace with your MIDI file path
+    input_file_path = 'midis/invent_bach/invent1.mid'  # Replace with your MIDI file path
     output_folder = 'tests_temp'  # Replace with your desired output folder
 
     n=10
@@ -31,35 +48,39 @@ if __name__ == "__main__" :
         n=int(sys.argv[1])
     print(n)
     for i in range(n):
-        # Create the MultiLayerNetwork object with the MIDI file and output folder
-        net1 = MultiLayerNetwork(input_file_path, output_folder, **randomize_args())
 
-        # Call createNet function
-        net1.create_net()
+        args = randomize_args()
+        try :
+            # Create the MultiLayerNetwork object with the MIDI file and output folder
+            net1 = MultiLayerNetwork(use_gui=False, midi_folder_or_file=input_file_path, output_folder=output_folder, **args, verbosity=0)
 
-        # Get the subnet and intergraph
-        net1.get_sub_net()
+            # Call createNet function
+            net1.create_net()
 
-        # Derive the output filename from the input MIDI filename
-        output_filename = os.path.splitext(os.path.basename(input_file_path))[0] + '.graphml'
+            # Get the subnet and intergraph
+            net1.get_sub_net()
 
-        # Extract the name without extension
-        name_without_extension = os.path.splitext(output_filename)[0]
+            # Derive the output filename from the input MIDI filename
+            output_filename = os.path.splitext(os.path.basename(input_file_path))[0] + '.graphml'
 
-        # Construct the path for the new subfolder
-        subfolder_path = os.path.join(output_folder, name_without_extension)
+            # Extract the name without extension
+            name_without_extension = os.path.splitext(output_filename)[0]
 
-        # Check if the subfolder exists; if not, create it
-        if not os.path.exists(subfolder_path):
-            os.makedirs(subfolder_path)
+            # Construct the path for the new subfolder
+            subfolder_path = os.path.join(output_folder, name_without_extension)
 
-        net1.convert_attributes_to_str()
+            # Check if the subfolder exists; if not, create it
+            if not os.path.exists(subfolder_path):
+                os.makedirs(subfolder_path)
 
-        # Export the multilayer network
-        net1.export_net(os.path.join(subfolder_path, output_filename))
+            net1.convert_attributes_to_str()
 
-        # Export subnets
-        net1.export_sub_net(os.path.join(output_folder, os.path.splitext(os.path.basename(input_file_path))[0]) + os.path.sep, os.path.splitext(os.path.basename(input_file_path))[0])
-    
-    print("Random tests passed")
+            # Export the multilayer network
+            net1.export_net(os.path.join(subfolder_path, output_filename))
+
+            # Export subnets
+            net1.export_sub_net(os.path.join(output_folder, os.path.splitext(os.path.basename(input_file_path))[0]) + os.path.sep, os.path.splitext(os.path.basename(input_file_path))[0])
+        except Exception as e:
+            print(e)
+            print(args)
 

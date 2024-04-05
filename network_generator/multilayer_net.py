@@ -1,6 +1,7 @@
 import music21 as ms
 import networkx as nx
 import parameter_picker as par_pick
+from preset_params import get_preset_params
 # import pandas as pd
 # import numpy as np
 import os
@@ -12,8 +13,11 @@ import math
 # import random
 
 class MultiLayerNetwork:
-    def __init__(self, use_gui=True, verbosity=1,**kwargs):
-        params = self.get_params(**kwargs)
+    def __init__(self, use_gui=True, verbosity=1, preset_param=None,**kwargs):
+        if preset_param is not None:
+            params = get_preset_params(preset_param)
+        else:
+            params = self.get_params(**kwargs)
         if use_gui:
             params = self.pick_parameters(params)
         self.parse_params(**params)
@@ -70,17 +74,18 @@ class MultiLayerNetwork:
                 self.stream_list.append(self.stream_to_C(whole_piece))
             else:
                 self.stream_list.append(whole_piece)
-            self.parsed_stream_list = [self.build_parsed_list(whole_piece, 0)]
         else:
             for part in whole_piece.parts: # loads each channel/instrument into stream list
                 if self.transpose:
                     self.stream_list.append(self.stream_to_C(part))
                 else:
                     self.stream_list.append(part)
-                self.parsed_stream_list = [self.build_parsed_list(part, i) for i,part in enumerate(self.stream_list)]
             for elt in whole_piece.recurse():
                 if 'Instrument' in elt.classes:
                     self.instruments.append(str(elt))
+        if self.group_by_beat:
+            self.group_notes_by_beat()
+        self.parsed_stream_list = [self.build_parsed_list(part, i) for i,part in enumerate(self.stream_list)]
 
     def parse_params(self, **params):
         self.rest = params["rest"]
@@ -94,16 +99,15 @@ class MultiLayerNetwork:
         self.transpose = params["transpose"]
         self.strict_link = params["strict_link"]
         self.max_link_time_diff = params["max_link_time_diff"]
-        self.layer = params["layer"]
         self.flatten = params["flatten"]
-        if self.flatten:
-            self.layer = False
-        self.diatonic_interval = params["diatonic_interval"]
-        if self.enharmony:
-            self.diatonic_interval = False
+        self.layer = params["layer"] and not self.flatten
+        self.diatonic_interval = params["diatonic_interval"] and not self.enharmony
         self.chromatic_interval = params["chromatic_interval"]
         self.chord_function = params["chord_function"]
+        self.group_by_beat = True
         self.midi_files = params["midi_files"]
+        for file_name in self.midi_files:
+            assert(os.path.splitext(file_name)[1] in [".mid", ".mscz"])
         self.outfolder = params["outfolder"]
     
     @property
@@ -137,11 +141,13 @@ class MultiLayerNetwork:
         infos["timestamp"] = elt.offset
         infos["pitch"] = self.parse_pitch(elt)
         infos["pitch_class"] = self.parse_pitch_class(elt)
-        infos["chord_function"] = ms.roman.romanNumeralFromChord(elt,self.key).figure if elt.isChord else "N/A"
+        infos["chord_function"] = ms.roman.romanNumeralFromChord(elt,self.key).romanNumeral if elt.isChord else "N/A"
+        # infos["chord_function"] = ms.roman.romanNumeralFromChord(elt,self.key).figure if elt.isChord else "N/A"
         return infos
 
     def build_parsed_list(self, part, i):
         lst = [self.parse_elt(elt,i) for elt in part.flatten().notesAndRests if not self.is_ignored(elt)]
+        if not lst : return lst
         for i in range(len(lst)-1):
             if lst[i]["rest"] or lst[i]["chord"] or lst[i+1]["rest"] or lst[i+1]["chord"]:
                 lst[i]["chromatic_interval"] = 0
@@ -174,7 +180,7 @@ class MultiLayerNetwork:
         if self.layer:
             return (infos["layer"],str(node))
         if self.chord_function:
-            return infos["chord_function"]
+            node["chord_function"] = infos["chord_function"]
         return str(node)
     
     def parse_pitch(self, elt):
@@ -382,6 +388,48 @@ class MultiLayerNetwork:
     
     def list_to_string(self,my_list):
         return ','.join(str(x) for x in my_list)
+    
+    def group_notes_by_beat(self):
+        stream_list_copy, self.stream_list = self.stream_list, []
+        for stream in stream_list_copy:
+            notes_and_rests = stream.flatten().notesAndRests
+            new_stream = ms.stream.Stream()
+            idx = 0
+            first_beat = math.floor(notes_and_rests[0].offset)
+            if len(notes_and_rests) == 0: continue
+            last_beat = math.floor(max([elt.offset + elt.quarterLength for elt in notes_and_rests]))
+            elts_in_beat = []
+            loop = True
+            for current_beat in range(first_beat, last_beat):
+                elts_in_beat = [elt for elt in elts_in_beat if elt.offset + elt.quarterLength > current_beat]
+                for i in range(idx, len(notes_and_rests)):
+                    if notes_and_rests[i].offset >= current_beat + 1:
+                        idx = i
+                        break
+                    elts_in_beat.append(notes_and_rests[i])
+                pitches_in_beat = [pitch for note in elts_in_beat if not note.isRest for pitch in note.pitches]
+                if pitches_in_beat:
+                    new_note = ms.chord.Chord(pitches_in_beat)
+                else:
+                    new_note = ms.note.Rest()
+                new_note.offset = current_beat
+                new_stream.append(new_note)
+                current_beat += 1
+            self.stream_list.append(new_stream)
+
+                
+    
+    # def split_chords(self):
+    #     assert(self.pitch)
+    #     for node in self.net:
+    #         notes_str = node["pitch"] if self.octave else node["pitch_class"]
+    #         notes_lst = notes_str.split(" ")
+    #         if len(notes_lst) <= 1: continue
+    #         new_nodes = []
+    #         for note in notes_lst:
+
+    #         for edge in 
+
     
 
 if __name__ == "__main__" :

@@ -65,6 +65,10 @@ perkins_params = {
 
 # Frottier et al.
 # Use human annoted partitions
+frottier_params = {
+    "chord_function":True,
+    "flatten":True
+}
 
 # Mrad et al.
 # Two networks :
@@ -77,4 +81,25 @@ mrad_melodic_params = {
 }
 
 # Harmonic
-# Missing functional analysis
+# Restrict chords to roman numerals + augmented/diminished symbols
+mrad_harmonic_params = {
+    "flatten":True,
+    "chord_function":True
+}
+
+preset_params = {
+    "liu" : liu_params,
+    "ferreti" : ferreti_params,
+    "gomez" : gomez_params,
+    "serra" : serra_params,
+    "nardelli" : nardelli_params,
+    "kulkarni" : kulkarni_params,
+    "rolla" : rolla_params,
+    "perkins" : perkins_params,
+    "frottier" : frottier_params,
+    "mrad_melodic" : mrad_melodic_params,
+    "mrad_harmonic" : mrad_harmonic_params
+}
+
+def get_preset_params(name):
+    return preset_params[name]
