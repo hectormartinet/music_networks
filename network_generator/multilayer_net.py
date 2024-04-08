@@ -334,6 +334,8 @@ class MultiLayerNetwork:
         for i in range(0,len(self.sub_net)):
             cur_out = filename + "_" + str(i) + ".graphml"
             nx.write_graphml(self.sub_net[i], cur_out)
+        cur_out = filename + "_intergraph.graphml"
+        nx.write_graphml(self.intergraph, cur_out)
 
     def create_net(self):
         """Create the main network
@@ -368,7 +370,8 @@ class MultiLayerNetwork:
             def filter(node, layer=i): return node[0]==layer # use default arg to avoid dependancy on i
             self.sub_net.append(nx.subgraph_view(self.net, filter_node=filter))
         # TODO make intergraph work
-        # self.intergraph = nx.subgraph_view(self.net, filter_edge=lambda edge: edge.inter).to_undirected()
+        def filter(node1,node2): return self.net[node1][node2]["inter"]
+        self.intergraph = nx.subgraph_view(self.net, filter_edge=filter)#.to_undirected()
         return self.sub_net, self.intergraph
     
     def get_nodes_list(self, layer=0):
@@ -419,19 +422,6 @@ class MultiLayerNetwork:
                 new_stream.append(new_note)
                 current_beat += 1
             self.stream_list.append(new_stream)
-
-                
-    
-    # def split_chords(self):
-    #     assert(self.pitch)
-    #     for node in self.net:
-    #         notes_str = node["pitch"] if self.octave else node["pitch_class"]
-    #         notes_lst = notes_str.split(" ")
-    #         if len(notes_lst) <= 1: continue
-    #         new_nodes = []
-    #         for note in notes_lst:
-
-    #         for edge in 
 
     
 
