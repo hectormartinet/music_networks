@@ -13,13 +13,14 @@ import math
 # import random
 
 class MultiLayerNetwork:
-    def __init__(self, use_gui=True, verbosity=1, preset_param=None,**kwargs):
+    def __init__(self, use_gui=True, verbosity=1, preset_param=None, name=None, **kwargs):
         if preset_param is not None:
             params = get_preset_params(preset_param)
         else:
             params = self.get_params(**kwargs)
         if use_gui:
             params = self.pick_parameters(params)
+        self.name = name
         self.parse_params(**params)
         self.verbosity = verbosity
         self.net = nx.DiGraph()
@@ -64,10 +65,11 @@ class MultiLayerNetwork:
         self.parsed_stream_list = []
         self.instruments = []
         self.intergraph = None
-        self.name = midifilename
         self.midi_file = midifilename
+        self.print_if_useful("Loading new midi : " + midifilename, 2)
         whole_piece = ms.converter.parse(midifilename, quarterLengthDivisors = (16,))
         self.original_key = whole_piece.flatten().analyze('key')
+        self.print_if_useful("Analysed key : " + str(self.original_key), 3)
         self.key = self.original_key
         if self.flatten:
             whole_piece = whole_piece.chordify()
@@ -438,7 +440,7 @@ if __name__ == "__main__" :
     output_folder = 'results/'  # Replace with your desired output folder
     
     # Create the MultiLayerNetwork object with the MIDI file and output folder
-    net1 = MultiLayerNetwork(use_gui=True, output_folder=output_folder)
+    net1 = MultiLayerNetwork(use_gui=True, output_folder=output_folder, name="test")
 
     # Call createNet function
     net1.create_net()
@@ -446,8 +448,10 @@ if __name__ == "__main__" :
     # Get the subnet and intergraph
     net1.get_sub_net()
 
+    if net1.name is not None:
+        output_filename = net1.name
     # Derive the output filename from the input MIDI filename
-    if os.path.isdir(input_file_path):
+    elif os.path.isdir(input_file_path):
         output_filename = os.path.dirname(input_file_path).split("/")[-1] + '.graphml'
     else:
         output_filename = os.path.splitext(os.path.basename(input_file_path))[0] + '.graphml'

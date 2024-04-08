@@ -27,9 +27,9 @@ gomez_params = {
 
 # Serra et al.
 # Missing timbre and loudness
-# Missing grouping notes by beat
 serra_params = {
     "pitch":True,
+    "group_by_beat":True,
     "enharmony":True
 }
 
@@ -37,6 +37,7 @@ serra_params = {
 # Post-processing to remove PCsets with weight under a given threshold
 nardelli_params = {
     "pitch":True,
+    "flatten":True,
     "enharmony": False
 }
 
@@ -49,7 +50,7 @@ kulkarni_params = {
 }
 
 # Rolla et al.
-# Different parts need to be merged together and each node contains multiple notes with its duration
+# Different parts need to be merged together and each node contains multiple notes with their duration
 rolla_params = {
     "pitch":True,
     "octave":True,
