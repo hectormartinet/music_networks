@@ -11,6 +11,7 @@ from tqdm import tqdm
 # import pyautogui
 import math
 # import random
+import json
 
 class MultiLayerNetwork:
     def __init__(self, use_gui=True, verbosity=1, preset_param=None, name=None, **kwargs):
@@ -142,8 +143,8 @@ class MultiLayerNetwork:
         infos["duration"] = elt.duration.quarterLength
         infos["offset"] = elt.offset - self.offset_period*math.floor(elt.offset/self.offset_period)
         infos["timestamp"] = elt.offset
-        infos["pitch"] = self.parse_pitch(elt)
-        infos["pitch_class"] = self.parse_pitch_class(elt)
+        infos["pitch"] = self.parse_pitch(elt, octave=True)
+        infos["pitch_class"] = self.parse_pitch(elt, octave=False)
         infos["chord_function"] = ms.roman.romanNumeralFromChord(elt,self.key).romanNumeral if elt.isChord else "N/A"
         # infos["chord_function"] = ms.roman.romanNumeralFromChord(elt,self.key).figure if elt.isChord else "N/A"
         return infos
@@ -181,38 +182,29 @@ class MultiLayerNetwork:
         if self.chromatic_interval:
             node["chromatic_interval"] = infos["chromatic_interval"]
         if self.layer:
-            return (infos["layer"],str(node))
+            return (infos["layer"],json.dumps(node))
         if self.chord_function:
             node["chord_function"] = infos["chord_function"]
-        return str(node)
+        return (0,json.dumps(node))
     
-    def parse_pitch(self, elt):
+    def parse_pitch(self, elt, octave):
         if elt.isNote:
-            return str(elt.pitch)
+            return self.pitch_to_str(elt.pitch, octave)
         if elt.isChord:
-            unique_notes = list(set([str(pitch) for pitch in elt.pitches]))
+            unique_notes = list(set([self.pitch_to_str(pitch, octave) for pitch in elt.pitches]))
             unique_notes.sort(key=lambda elt : ms.pitch.Pitch(elt).midi)
             return " ".join(unique_notes)
         if elt.isRest:
             return "rest"
         assert(False)
 
-    def parse_pitch_class(self, elt):
-        if elt.isNote:
-            return self.pitch_to_str(elt.pitch)
-        if elt.isChord:
-            unique_notes = list(set([self.pitch_to_str(pitch) for pitch in elt.pitches]))
-            unique_notes.sort(key=lambda elt : ms.pitch.Pitch(elt).midi)
-            return " ".join(unique_notes)
-        if elt.isRest:
-            return "rest"
-        assert(False)
-
-    def pitch_to_str(self, pitch):
+    def pitch_to_str(self, pitch, octave):
         if self.enharmony:
-            return str(ms.pitch.Pitch(pitch.midi))
+            pitch = ms.pitch.Pitch(pitch.midi)
+        if octave:
+            return str(pitch)
         else:
-            return str(pitch.name)
+            return pitch.name
     
     def stream_to_network(self):
         s_len = len(self.stream_list)
@@ -330,9 +322,9 @@ class MultiLayerNetwork:
         except:
             pass
         self.print_if_useful("[+] Writing " + str(len(self.stream_list)) + " graphml subnet files to : " + folder, 1)
-        filename = folder + filename + "l"
+        filename = folder + filename
         for i in range(0,len(self.sub_net)):
-            cur_out = filename + "_" + str(i) + ".graphml"
+            cur_out = filename + "l_" + str(i) + ".graphml"
             nx.write_graphml(self.sub_net[i], cur_out)
         cur_out = filename + "_intergraph.graphml"
         nx.write_graphml(self.intergraph, cur_out)
@@ -375,10 +367,7 @@ class MultiLayerNetwork:
         return self.sub_net, self.intergraph
     
     def get_nodes_list(self, layer=0):
-        if self.layer:
-            return [self.build_node(elt)[1] for elt in self.parsed_stream_list[layer]]
-        else:
-            return [self.build_node(elt) for elt in self.parsed_stream_list[0]]
+        return [self.build_node(elt)[1] for elt in self.parsed_stream_list[layer]]
     
     def export_nodes_list(self, file, layer=0):
         """Export the list of nodes in the order they are played in the song
@@ -439,7 +428,7 @@ if __name__ == "__main__" :
     net1.get_sub_net()
 
     if net1.name is not None:
-        output_filename = net1.name
+        output_filename = net1.name + '.graphml'
     # Derive the output filename from the input MIDI filename
     elif os.path.isdir(input_file_path):
         output_filename = os.path.dirname(input_file_path).split("/")[-1] + '.graphml'
@@ -462,5 +451,5 @@ if __name__ == "__main__" :
     net1.export_net(os.path.join(subfolder_path, output_filename))
 
     # Export subnets
-    net1.export_sub_net(os.path.join(output_folder, name_without_extension) + os.path.sep, output_filename)
+    net1.export_sub_net(os.path.join(output_folder, name_without_extension) + os.path.sep, name_without_extension)
     net1.export_nodes_list("test.txt",0)
