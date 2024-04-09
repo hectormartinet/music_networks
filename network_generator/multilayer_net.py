@@ -182,10 +182,10 @@ class MultiLayerNetwork:
         if self.chromatic_interval:
             node["chromatic_interval"] = infos["chromatic_interval"]
         if self.layer:
-            return (infos["layer"],json.dumps(node))
+            node["layer"] = infos["layer"]
         if self.chord_function:
             node["chord_function"] = infos["chord_function"]
-        return (0,json.dumps(node))
+        return json.dumps(node)
     
     def parse_pitch(self, elt, octave):
         if elt.isNote:
@@ -204,7 +204,7 @@ class MultiLayerNetwork:
         if octave:
             return str(pitch)
         else:
-            return pitch.name
+            return pitch.name 
     
     def stream_to_network(self):
         s_len = len(self.stream_list)
@@ -355,11 +355,11 @@ class MultiLayerNetwork:
             List NetworkX: The list of subnetworks
         """
         if not self.layer:
-            return self.net
+            return self.net, nx.DiGraph()
         s_len = len(self.stream_list)
         self.sub_net =[]
         for i in range(s_len):
-            def filter(node, layer=i): return node[0]==layer # use default arg to avoid dependancy on i
+            def filter(node, layer=i): return self.net.nodes[node]["layer"]==layer # use default arg to avoid dependancy on i
             self.sub_net.append(nx.subgraph_view(self.net, filter_node=filter))
         # TODO make intergraph work
         def filter(node1,node2): return self.net[node1][node2]["inter"]
@@ -367,7 +367,7 @@ class MultiLayerNetwork:
         return self.sub_net, self.intergraph
     
     def get_nodes_list(self, layer=0):
-        return [self.build_node(elt)[1] for elt in self.parsed_stream_list[layer]]
+        return [self.build_node(elt) for elt in self.parsed_stream_list[layer]]
     
     def export_nodes_list(self, file, layer=0):
         """Export the list of nodes in the order they are played in the song
