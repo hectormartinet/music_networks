@@ -2,15 +2,9 @@ import music21 as ms
 import networkx as nx
 import parameter_picker as par_pick
 from preset_params import get_preset_params
-# import pandas as pd
-# import numpy as np
 import os
-# import matplotlib.pyplot as plt
-# import collections
 from tqdm import tqdm
-# import pyautogui
 import math
-# import random
 import json
 
 class MultiLayerNetwork:
@@ -110,6 +104,7 @@ class MultiLayerNetwork:
         self.chord_function = params["chord_function"]
         self.group_by_beat = params["group_by_beat"]
         self.midi_files = params["midi_files"]
+        self.duration_weighted = True
         for file_name in self.midi_files:
             assert(os.path.splitext(file_name)[1] in [".mid", ".mscz"])
         self.outfolder = params["outfolder"]
@@ -244,11 +239,14 @@ class MultiLayerNetwork:
                 if (self.strict_link and timestamp2 > timestamp) or timestamp2 >= timestamp + duration:
                     break
                 layer2 = all_nodes_infos[j]["layer"]
+                duration2 = all_nodes_infos[j]["duration"]
+
                 node2 = self.build_node(all_nodes_infos[j])
+                weight = min(timestamp+duration,timestamp2+duration2)-max(timestamp,timestamp2) if self.duration_weighted else 1
                 if layer != layer2:
                     # add undirected edge
-                    self.add_or_update_edge(node, node2, inter=True)
-                    self.add_or_update_edge(node2, node, inter=True)
+                    self.add_or_update_edge(node, node2, inter=True, weight=weight)
+                    self.add_or_update_edge(node2, node, inter=True, weight=weight)
                 j += 1
 
     def add_or_update_node(self, node, infos):
@@ -287,12 +285,12 @@ class MultiLayerNetwork:
             append_if_list("chord_function")
             self.net.nodes[node]["timestamps"].append(float(infos["timestamp"]))
     
-    def add_or_update_edge(self, from_node, to_node, inter):
+    def add_or_update_edge(self, from_node, to_node, inter, weight=1):
         if from_node is None or to_node is None: return
         if self.net.has_edge(from_node, to_node):
-            self.net[from_node][to_node]["weight"] += 1
+            self.net[from_node][to_node]["weight"] += weight
         else:
-            self.net.add_edge(from_node, to_node, weight=1, inter=inter)
+            self.net.add_edge(from_node, to_node, weight=weight, inter=inter)
 
     def convert_attributes_to_str(self):
         for node in self.net.nodes:
@@ -415,11 +413,13 @@ class MultiLayerNetwork:
     
 
 if __name__ == "__main__" :
-    input_file_path = 'midis/test_pitches.mid'  # Replace with your MIDI file path
+
+    input_file_path = 'midis/test_duration_weighted.mid'  # Replace with your MIDI file path
+    midi_files = [input_file_path]
     output_folder = 'results/'  # Replace with your desired output folder
     
     # Create the MultiLayerNetwork object with the MIDI file and output folder
-    net1 = MultiLayerNetwork(use_gui=True, output_folder=output_folder, name="test")
+    net1 = MultiLayerNetwork(use_gui=True, output_folder="", name="test", pitch=True, duration=True, octave=True, rest=True, midi_files=midi_files, transpose=True)
 
     # Call createNet function
     net1.create_net()
