@@ -9,8 +9,55 @@ import json
 
 class MultiLayerNetwork:
     def __init__(self, use_gui=True, verbosity=1, preset_param=None, name=None, **kwargs):
+        """
+        Class to create a network from midi files
+
+        Args:
+            use_gui (bool, optional) : Launch a small UI to choose the parameters of the network
+            verbosity (int, optional): Amount of information printed when building the network
+            preset_params(str, optional): Use some preset parameters to replicate networks of some papers:
+                "liu"
+                "ferreti"
+                "gomez"
+                "serra"
+                "nardelli"
+                "kulkarni"
+                "rolla"
+                "perkins"
+                "frottier"
+                "mrad_melodic"
+                "mrad_harmonic"
+            name(str, optional): Give a name to your network !
+            
+            [**kwargs]: all network parameters(all optional with a default value)
+            Node parameters: Booleans to know which values are hold by the nodes.
+                pitch(bool): Pitch of the note disregarding octave. Defaults to True.
+                octave(bool): Octave of the note. Defaults to False.
+                duration(bool): Duration of the note in quarter notes. Defaults to False.
+                offset(bool), offset_period(float): The offset of the note modulo the offset_period. Defaults to False, 1.
+                chromatic_interval(bool): Chromatic interval with the next note. Defaults to False.
+                diatonic_interval(bool): Diatonic interval with the next note. Defaults to False.
+                chord_function(bool): Give the corresponding degree of the chord
+
+            Edge parameters: To know when two nodes are linked
+                strict_link(bool): Only link nodes from different layers when the corresponding notes play at the same time \
+                    otherwise link nodes if the corresponding note play together at some point. Defaults to False.
+                max_link_time_diff(float): Maximal time difference in quarter notes between two consecutive notes \
+                    (i.e. just separated by rests) for them to be linked. Defaults to 4.
+
+            General structure parameters: Describe the general behaviour of the network
+                layer(bool): Create a network with a layer for every part. Defaults to True.
+                transpose(bool): Transpose the song in C major/ A minor depending on the mode based on the starting tonality. Defaults to False.
+                flatten(bool): Flatten the song and treat everything as one part.
+                enharmony(bool): Treat equivalent notes (e.g. C# and Db) as the same note. Defaults to True.
+                group_by_beat(bool): Group the notes of each part by beat and set durations to 1. Defaults to False.
+
+            Input/Output parameters:
+                midi_files(list[str]): List of midis to use.
+                outfolder(str): Output folder for all the graphs.
+        """
         if preset_param is not None:
-            params = get_preset_params(preset_param)
+            params = self.get_params(**get_preset_params(preset_param))
         else:
             params = self.get_params(**kwargs)
         if use_gui:
@@ -293,6 +340,9 @@ class MultiLayerNetwork:
             self.net.add_edge(from_node, to_node, weight=weight, inter=inter)
 
     def convert_attributes_to_str(self):
+        """
+        Necessary step before exporting graph.
+        """
         for node in self.net.nodes:
             for attribute in self.net.nodes[node].keys():
                 if type(self.net.nodes[node][attribute]) == list :
@@ -347,7 +397,7 @@ class MultiLayerNetwork:
         return self.net
     
     def get_sub_net(self):
-        """Return the list of subnetworks
+        """Build and return the list of subnetworks
 
         Returns:
             List NetworkX: The list of subnetworks
@@ -414,12 +464,12 @@ class MultiLayerNetwork:
 
 if __name__ == "__main__" :
 
-    input_file_path = 'midis/test_duration_weighted.mid'  # Replace with your MIDI file path
+    input_file_path = 'midis/schubert_quartet.mid'  # Replace with your MIDI file path
     midi_files = [input_file_path]
     output_folder = 'results/'  # Replace with your desired output folder
     
     # Create the MultiLayerNetwork object with the MIDI file and output folder
-    net1 = MultiLayerNetwork(use_gui=True, output_folder="", name="test", pitch=True, duration=True, octave=True, rest=True, midi_files=midi_files, transpose=True)
+    net1 = MultiLayerNetwork(use_gui=True, output_folder="", name="test", preset_param="serra")
 
     # Call createNet function
     net1.create_net()
