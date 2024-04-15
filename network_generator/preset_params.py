@@ -30,6 +30,7 @@ gomez_params = {
 serra_params = {
     "pitch":True,
     "group_by_beat":True,
+    "flatten":True,
     "enharmony":True
 }
 
