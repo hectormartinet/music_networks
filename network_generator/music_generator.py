@@ -43,15 +43,14 @@ class MusicGenerator:
     def network_node_weight(self, network, node):
         return network.nodes[node]["weight"] if network.has_node(node) else 0
     
-    def intergraph_weight(self, intergraph, node, indices, timestamp, duration, laplace_smoothing=0.1):
+    def intergraph_weight(self, intergraph, node, indices, timestamp, duration, laplace_smoothing=1):
         intergraph_log_weight = 0
         assert(len(indices) == len(self.part_list))
         for lst_id,idx in enumerate(indices):
             note = self.part_list[lst_id][idx]
             t_min = note.offset
             t_max = note.offset + note.quarterLength
-            if t_max<=timestamp:
-                print(t_max, ",", timestamp)
+            assert(t_max>timestamp)
             while t_min < timestamp + duration:
                 other_node = self.nodes_lists[lst_id][idx]
                 weight = (min(t_max, timestamp + duration) - max(t_min, timestamp))/duration
@@ -71,7 +70,7 @@ class MusicGenerator:
         weights = [self.network_node_weight(network, node) for node in network]
         return random.choices(list(network.nodes()), weights)[0]
     
-    def total_weighted_random_node(self, network, intergraph, indices, timestamp, alpha, beta, laplace_smoothing=0.1):
+    def total_weighted_random_node(self, network, intergraph, indices, timestamp, alpha, beta, laplace_smoothing=1):
         weights = [self.total_node_weight(network, intergraph, node, indices, timestamp, self.duration(network,node), alpha, beta, laplace_smoothing) for node in network]
         return random.choices(list(network.nodes()), weights)[0]
 
@@ -94,7 +93,7 @@ class MusicGenerator:
             return self.total_weighted_random_node(network,intergraph,indices,timestamp,alpha,beta)
         return random.choices(list(network.neighbors(prev_node)), weights)[0]
     
-    def total_edge_weight(self, network, intergraph, prev_node, next_node, indices, timestamp, duration, alpha, beta, laplace_smoothing=0.1):
+    def total_edge_weight(self, network, intergraph, prev_node, next_node, indices, timestamp, duration, alpha, beta, laplace_smoothing=1):
         network_weight = self.network_edge_weight(network, prev_node, next_node)
         intergraph_weight = self.intergraph_weight(intergraph, next_node, indices, timestamp, duration, laplace_smoothing)
         return network_weight**alpha * intergraph_weight**beta
@@ -109,7 +108,7 @@ class MusicGenerator:
 
         Args:
             network (NetworkX): The network to walk on
-            number_of_notes (int, optional): Number of note to generate in the stream. Defaults to 50.
+            number_of_notes (int, optional): Number of note to generate in the stream. Defaults to 100.
 
         Returns:
             stream: The final stream
@@ -167,7 +166,6 @@ class MusicGenerator:
                     note = self.part_list[i][indices[i]]
             if not loop:
                 break
-            other_nodes = [self.nodes_lists[i][indices[i]] for i in range(nb_voices)]
             node_list.append(self.total_weighted_random_next_node(network,intergraph,node_list[-1],indices,timestamp,alpha,beta))
             part.append(self.node_to_note(node_list[-1]))
         # stream.show()
@@ -181,16 +179,15 @@ class MusicGenerator:
 if __name__ == "__main__":
 
     directory = "midis\\invent_bach\\"
-    # files_number = [1,8,14]
-    midi_files = [directory + f for f in os.listdir(directory)]
-    # midi_files = [directory + "invent"+str(n)+".mid" for n in files_number]
+    files_number = [1,2,5,7,8,9,11,13,14] # pieces in binary to not mess up with the offset parameter
+    # midi_files = [directory + f for f in os.listdir(directory)]
+    midi_files = [directory + "invent"+str(n)+".mid" for n in files_number]
     melody_file = [directory + "invent1.mid"]
-    # midi_files = ["midis\\test_2voices.mid"]
 
     # Create the MultiLayerNetwork object with the MIDI file and output folder
-    net = multilayer_net.MultiLayerNetwork(use_gui=False, output_folder="", name="test", pitch=True, duration=True, octave=True, offset=True, rest=True, midi_files=midi_files, transpose=True)
-    net2 = multilayer_net.MultiLayerNetwork(use_gui=False, output_folder="", name="test", pitch=True, duration=True, octave=True, offset=True, rest=True, midi_files=melody_file, transpose=True)
-
+    net = multilayer_net.MultiLayerNetwork(use_gui=False, output_folder="", name="test", pitch=True, duration=True, octave=True, offset=True, rest=True, midi_files=midi_files, enharmony=True, transpose=True)
+    net2 = multilayer_net.MultiLayerNetwork(use_gui=False, output_folder="", name="test", pitch=True, duration=True, octave=True, offset=True, rest=True, midi_files=melody_file, enharmony=True, transpose=True)
+    
     # Call createNet function
     net.create_net()
     net2.create_net()
@@ -203,5 +200,5 @@ if __name__ == "__main__":
     generator.nodes_lists.append(net2.get_nodes_list(0))
     generator.part_list.append(ms.stream.Part([generator.node_to_note(node) for node in generator.nodes_lists[-1]]))
     for i in range(1,len(net.sub_net)):
-        generator.add_voice_with_rw(net.sub_net[i], net.intergraph)
+        generator.add_voice_with_rw(net.sub_net[i], net.intergraph, alpha=1, beta=1)
     generator.show_music()
