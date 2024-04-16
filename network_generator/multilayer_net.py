@@ -6,6 +6,7 @@ import os
 from tqdm import tqdm
 import math
 import json
+import copy
 
 class MultiLayerNetwork:
     def __init__(self, use_gui=True, verbosity=1, preset_param=None, name=None, **kwargs):
@@ -71,6 +72,11 @@ class MultiLayerNetwork:
     def print_if_useful(self, message, verbosity_level):
         if verbosity_level <= self.verbosity:
             print(message)
+
+    def get_flatten_stream(self, layer):
+        if not self.split_chords:
+            return self.parsed_stream_list[layer]
+        return [elt for sub_lst in self.parsed_stream_list[layer] for elt in sub_lst]
 
     def get_params(self, **kwargs):
         default_params = {
@@ -151,7 +157,9 @@ class MultiLayerNetwork:
         self.chord_function = params["chord_function"]
         self.group_by_beat = params["group_by_beat"]
         self.midi_files = params["midi_files"]
-        self.duration_weighted = True
+        self.duration_weighted = True # TODO make a working parameter
+        self.keep_extra = True # TODO keep supplementary info or not (for large dataset, you don't want to have this)
+        self.split_chords = True # TODO make a working parameter
         for file_name in self.midi_files:
             assert(os.path.splitext(file_name)[1] in [".mid", ".mscz"])
         self.outfolder = params["outfolder"]
@@ -189,22 +197,45 @@ class MultiLayerNetwork:
         infos["pitch_class"] = self.parse_pitch(elt, octave=False)
         infos["chord_function"] = ms.roman.romanNumeralFromChord(elt,self.key).romanNumeral if elt.isChord else "N/A"
         # infos["chord_function"] = ms.roman.romanNumeralFromChord(elt,self.key).figure if elt.isChord else "N/A"
-        return infos
+        if not self.split_chords:
+            return infos
+        if not elt.isChord:
+            return [infos]
+        info_lst = []
+        for note in elt:
+            info_copy = copy.deepcopy(infos)
+            info_copy["pitch"] = self.parse_pitch(note, octave=True)
+            info_copy["pitch_class"] = self.parse_pitch(note, octave=False)
+            info_copy["chord"] = False
+            info_lst.append(info_copy)
+        return info_lst
 
     def build_parsed_list(self, part, i):
         lst = [self.parse_elt(elt,i) for elt in part.flatten().notesAndRests if not self.is_ignored(elt)]
         if not lst : return lst
+        def build_lst(elt): return elt if type(elt)==list else [elt]
         for i in range(len(lst)-1):
-            if lst[i]["rest"] or lst[i]["chord"] or lst[i+1]["rest"] or lst[i+1]["chord"]:
-                lst[i]["chromatic_interval"] = 0
-                lst[i]["diatonic_interval"] = 0
-                continue
-            interval = ms.interval.Interval(ms.pitch.Pitch(lst[i]["pitch"]), ms.pitch.Pitch(lst[i+1]["pitch"]))
-            lst[i]["diatonic_interval"] = interval.diatonic.generic.value
-            lst[i]["chromatic_interval"] = interval.chromatic.semitones
-        lst[len(lst)-1]["chromatic_interval"] = 0 # TODO Change default values...
-        lst[len(lst)-1]["diatonic_interval"] = 0
+            if self.split_chords:
+                for prev_elt in lst[i]:
+                    for next_elt in lst[i+1]:
+                        self.parse_interval(prev_elt, next_elt)
+            else:
+                self.parse_interval(lst[i], lst[i+1])
+        if self.split_chords:
+            for elt in lst[len(lst)-1]:
+                self.parse_interval(elt)
+        else:
+            self.parse_interval(lst[len(lst)-1])
         return lst
+    
+    def parse_interval(self, prev_elt, next_elt=None):
+        if next_elt is None or prev_elt["rest"] or prev_elt["chord"] or next_elt["rest"] or next_elt["chord"]:
+            prev_elt["chromatic_interval"] = 0
+            prev_elt["diatonic_interval"] = 0
+            return
+        interval = ms.interval.Interval(ms.pitch.Pitch(prev_elt["pitch"]), ms.pitch.Pitch(prev_elt["pitch"]))
+        prev_elt["diatonic_interval"] = interval.diatonic.generic.value
+        prev_elt["chromatic_interval"] = interval.chromatic.semitones
 
     def build_node(self, infos):
         node = {}
@@ -259,9 +290,10 @@ class MultiLayerNetwork:
             self.process_inter_layer()
         return self.net
 
-    def process_intra_layer(self, i, prev_elt=None):
+    def process_intra_layer(self, layer, prev_elt=None):
+        if self.split_chords: return self.process_intra_layer_splited(layer, prev_elt)
         prev_node = self.build_node(prev_elt) if prev_elt is not None else None
-        for elt in self.parsed_stream_list[i]:
+        for elt in self.parsed_stream_list[layer]:
             node = self.build_node(elt)
             self.add_or_update_node(node, elt)
             if prev_elt is not None:
@@ -270,10 +302,25 @@ class MultiLayerNetwork:
                     self.add_or_update_edge(prev_node, node, inter=False)
             prev_node = node
             prev_elt = elt
+
+    def process_intra_layer_splited(self, layer, prev_elts=None):
+        prev_nodes = [self.build_node(elt) for elt in prev_elts] if prev_elts is not None else None
+        for elts in self.parsed_stream_list[layer]:
+            nodes = [self.build_node(elt) for elt in elts]
+            for node, elt in zip(nodes, elts):
+                self.add_or_update_node(node, elt)
+            if prev_elts is not None:
+                time_diff = elts[0]["timestamp"] - prev_elts[0]["timestamp"] - prev_elts[0]["duration"]
+                if time_diff <= self.max_link_time_diff:
+                    for node in nodes:
+                        for prev_node in prev_nodes:
+                            self.add_or_update_edge(prev_node, node, inter=False)
+            prev_nodes = nodes
+            prev_elts = elts
     
     def process_inter_layer(self):
         s_len = len(self.stream_list)
-        all_nodes_infos = [elt for lst in self.parsed_stream_list for elt in lst]
+        all_nodes_infos = [elt for layer in range(len(self.stream_list)) for elt in self.get_flatten_stream(layer)]
         all_nodes_infos.sort(key=lambda x: x["timestamp"])
         nb_notes = len(all_nodes_infos)
         for i in range(nb_notes):
@@ -298,11 +345,11 @@ class MultiLayerNetwork:
 
     def add_or_update_node(self, node, infos):
         if not self.net.has_node(node):
-            def conditional_list(elt, no_list):
-                return elt if no_list else [elt]
+            def conditional_list(elt, elt_param):
+                return elt if elt_param else [elt]
             self.net.add_node(node, 
                 weight=1, 
-                layer = conditional_list(infos["layer"],self.layer), 
+                layer = conditional_list(infos["layer"], self.layer), 
                 pitch = conditional_list(infos["pitch"], self.pitch and self.octave),
                 pitch_class = conditional_list(infos["pitch_class"], self.pitch),
                 chromatic_interval = conditional_list(infos["chromatic_interval"], self.chromatic_interval),
@@ -415,7 +462,7 @@ class MultiLayerNetwork:
         return self.sub_net, self.intergraph
     
     def get_nodes_list(self, layer=0):
-        return [self.build_node(elt) for elt in self.parsed_stream_list[layer]]
+        return [self.build_node(elt) for elt in self.get_flatten_stream(layer)]
     
     def export_nodes_list(self, file, layer=0):
         """Export the list of nodes in the order they are played in the song
@@ -459,7 +506,6 @@ class MultiLayerNetwork:
                 new_stream.append(new_note)
                 current_beat += 1
             self.stream_list.append(new_stream)
-
     
 
 if __name__ == "__main__" :
