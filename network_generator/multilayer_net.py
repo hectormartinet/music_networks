@@ -161,7 +161,7 @@ class MultiLayerNetwork:
         self.keep_extra = True # TODO keep supplementary info or not (for large dataset, you don't want to have this)
         self.split_chords = False # TODO make a working parameter
         for file_name in self.midi_files:
-            assert(os.path.splitext(file_name)[1] in [".mid", ".mscz"])
+            assert(os.path.splitext(file_name)[1] in [".mid", ".musicxml"])
         self.outfolder = params["outfolder"]
     
     @property
