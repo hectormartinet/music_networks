@@ -159,7 +159,7 @@ class MultiLayerNetwork:
         self.midi_files = params["midi_files"]
         self.duration_weighted = True # TODO make a working parameter
         self.keep_extra = True # TODO keep supplementary info or not (for large dataset, you don't want to have this)
-        self.split_chords = True # TODO make a working parameter
+        self.split_chords = False # TODO make a working parameter
         for file_name in self.midi_files:
             assert(os.path.splitext(file_name)[1] in [".mid", ".mscz"])
         self.outfolder = params["outfolder"]
