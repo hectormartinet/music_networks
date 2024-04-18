@@ -9,7 +9,7 @@ import json
 import copy
 
 class MultiLayerNetwork:
-    def __init__(self, use_gui=True, verbosity=1, preset_param=None, name=None, **kwargs):
+    def __init__(self, use_gui=True, verbosity=1, preset_param=None, name="No_name", **kwargs):
         """
         Class to create a network from midi files
 
@@ -163,6 +163,8 @@ class MultiLayerNetwork:
         for file_name in self.midi_files:
             assert(os.path.splitext(file_name)[1] in [".mid", ".musicxml"])
         self.outfolder = params["outfolder"]
+        if not self.outfolder.endswith(os.path.sep):
+            self.outfolder += os.path.sep
     
     @property
     def interval(self): return self.diatonic_interval or self.chromatic_interval
@@ -185,9 +187,9 @@ class MultiLayerNetwork:
             return True
         return False
 
-    def parse_elt(self, elt, i):
+    def parse_elt(self, elt, layer=0):
         infos = {}
-        infos["layer"] = i
+        infos["layer"] = layer
         infos["rest"] = elt.isRest
         infos["chord"] = elt.isChord
         infos["duration"] = elt.duration.quarterLength
@@ -395,23 +397,31 @@ class MultiLayerNetwork:
                 if type(self.net.nodes[node][attribute]) == list :
                     self.net.nodes[node][attribute] = self.list_to_string(self.net.nodes[node][attribute])
 
-    def export_net(self, filename):
+    def default_filepath(self, extension):
+        return self.outfolder + self.name + extension
+
+    def export_net(self, file_path=None):
         """Export the network to a graphml file
 
         Args:
             filename (string): Output filename
         """
+        if file_path is None:
+            file_path = self.default_filepath(".graphml")
+        self.print_if_useful("[+] Writing main graphml file to : " + file_path, 1)
+        nx.write_graphml(self.net, file_path)
 
-        self.print_if_useful("[+] Writing main graphml file to : " + filename, 1)
-        nx.write_graphml(self.net, filename)
-
-    def export_sub_net(self, folder, filename):
+    def export_sub_net(self, folder=None, filename=None):
         """Export the subnet to a graphml file
 
         Args:
             folder (string): Output folder
             filename (string): Output filename
         """
+        if folder is None:
+            folder = self.outfolder
+        if filename is None:
+            filename = self.name
         try:
             os.mkdir(folder)
         except:
@@ -464,7 +474,7 @@ class MultiLayerNetwork:
     def get_nodes_list(self, layer=0):
         return [self.build_node(elt) for elt in self.get_flatten_stream(layer)]
     
-    def export_nodes_list(self, file, layer=0):
+    def export_nodes_list(self, file_path=None, layer=0):
         """Export the list of nodes in the order they are played in the song
 
         Args:
@@ -472,8 +482,10 @@ class MultiLayerNetwork:
             layer (int): index of the layer to export
 
         """
+        if file_path is None:
+            file_path = self.default_filepath(".txt")
         lst = self.get_nodes_list(layer)
-        open(file,"w").write("\n".join(lst))
+        open(file_path,"w").write("\n".join(lst))
 
     
     def list_to_string(self,my_list):
@@ -515,37 +527,20 @@ if __name__ == "__main__" :
     output_folder = 'results/'  # Replace with your desired output folder
     
     # Create the MultiLayerNetwork object with the MIDI file and output folder
-    net1 = MultiLayerNetwork(use_gui=True, output_folder="", name="test", preset_param="serra")
+    net1 = MultiLayerNetwork(use_gui=True, output_folder=output_folder, name="test", preset_param="serra")
 
     # Call createNet function
     net1.create_net()
 
     # Get the subnet and intergraph
     net1.get_sub_net()
-
-    if net1.name is not None:
-        output_filename = net1.name + '.graphml'
-    # Derive the output filename from the input MIDI filename
-    elif os.path.isdir(input_file_path):
-        output_filename = os.path.dirname(input_file_path).split("/")[-1] + '.graphml'
-    else:
-        output_filename = os.path.splitext(os.path.basename(input_file_path))[0] + '.graphml'
-
-    # Extract the name without extension
-    name_without_extension = os.path.splitext(output_filename)[0]
-
-    # Construct the path for the new subfolder
-    subfolder_path = os.path.join(output_folder, name_without_extension)
-
-    # Check if the subfolder exists; if not, create it
-    if not os.path.exists(subfolder_path):
-        os.makedirs(subfolder_path)
-
     net1.convert_attributes_to_str()
 
     # Export the multilayer network
-    net1.export_net(os.path.join(subfolder_path, output_filename))
+    net1.export_net()
 
     # Export subnets
-    net1.export_sub_net(os.path.join(output_folder, name_without_extension) + os.path.sep, name_without_extension)
-    net1.export_nodes_list("test.txt",0)
+    net1.export_sub_net()
+    
+    # Export node list
+    net1.export_nodes_list()
