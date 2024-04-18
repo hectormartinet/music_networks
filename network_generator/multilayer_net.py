@@ -9,7 +9,7 @@ import json
 import copy
 
 class MultiLayerNetwork:
-    def __init__(self, use_gui=True, verbosity=1, preset_param=None, name="auto", **kwargs):
+    def __init__(self, use_gui=True, verbosity=1, preset_param=None, name="auto", **params):
         """
         Class to create a network from midi files
 
@@ -82,8 +82,8 @@ class MultiLayerNetwork:
             "outfolder":"results"
         }
         if preset_param is not None:
-            params = self.get_params(params, **get_preset_params(preset_param))
-        params = self.get_params(params, **kwargs)
+            self.overwrite_params(params, **get_preset_params(preset_param))
+        self.overwrite_params(params, **params)
         if use_gui:
             params = self.pick_parameters(params)
         self.parse_params(**params)
@@ -116,11 +116,11 @@ class MultiLayerNetwork:
             return self.parsed_stream_list[layer]
         return [elt for sub_lst in self.parsed_stream_list[layer] for elt in sub_lst]
 
-    def get_params(self, default_params, **kwargs):
-        for key in default_params.keys():
-            if key in kwargs:
-                default_params[key] = kwargs[key]
-        return default_params
+    def overwrite_params(self, current_params, **new_params):
+        for key in current_params.keys():
+            if key in new_params:
+                current_params[key] = new_params[key]
+        return current_params
 
     def pick_parameters(self, params):
         return par_pick.get_parameters(params)
