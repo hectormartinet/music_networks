@@ -96,6 +96,9 @@ class MultiLayerNetwork:
             "strict_link":False,
             "max_link_time_diff":4.,
             "group_by_beat":False,
+            "split_chords":False,
+            "duration_weighted_intergraph":True,
+            "analyze_key":True,
             "midi_files":["midis/invent_bach/invent1.mid"],
             "outfolder":"results/"
         }
@@ -116,9 +119,10 @@ class MultiLayerNetwork:
         self.midi_file = midifilename
         self.print_if_useful("Loading new midi : " + midifilename, 2)
         whole_piece = ms.converter.parse(midifilename, quarterLengthDivisors = (16,))
-        self.original_key = whole_piece.flatten().analyze('key')
-        self.print_if_useful("Analysed key : " + str(self.original_key), 3)
-        self.key = self.original_key
+        if self.analyze_key:
+            self.original_key = whole_piece.flatten().analyze('key')
+            self.print_if_useful("analyzed key : " + str(self.original_key), 3)
+            self.key = self.original_key
         if self.flatten:
             whole_piece = whole_piece.chordify()
             if self.transpose:
@@ -159,9 +163,10 @@ class MultiLayerNetwork:
         self.midi_files = params["midi_files"]
         if type(self.midi_files) != list:
             self.midi_files = [self.midi_files] 
-        self.duration_weighted = True # TODO make a working parameter
+        self.duration_weighted_intergraph = params["duration_weighted_intergraph"]
         self.keep_extra = True # TODO keep supplementary info or not (for large dataset, you don't want to have this)
-        self.split_chords = False # TODO make a working parameter
+        self.split_chords = params["split_chords"]
+        self.analyze_key = params["analyze_key"] and not self.transpose
         for file_name in self.midi_files:
             assert(os.path.splitext(file_name)[1] in [".mid", ".musicxml"])
         self.outfolder = params["outfolder"]
@@ -188,6 +193,11 @@ class MultiLayerNetwork:
         if self.interval and elt.isChord:
             return True
         return False
+    
+    def parse_chord_function(self, elt):
+        if not self.analyze_key or not elt.isChord:
+            return "N/A"
+        return ms.roman.romanNumeralFromChord(elt,self.key).romanNumeral
 
     def parse_elt(self, elt, layer=0):
         infos = {}
@@ -199,7 +209,7 @@ class MultiLayerNetwork:
         infos["timestamp"] = elt.offset
         infos["pitch"] = self.parse_pitch(elt, octave=True)
         infos["pitch_class"] = self.parse_pitch(elt, octave=False)
-        infos["chord_function"] = ms.roman.romanNumeralFromChord(elt,self.key).romanNumeral if elt.isChord else "N/A"
+        infos["chord_function"] = self.parse_chord_function(elt)
         # infos["chord_function"] = ms.roman.romanNumeralFromChord(elt,self.key).figure if elt.isChord else "N/A"
         if not self.split_chords:
             return infos
@@ -340,7 +350,7 @@ class MultiLayerNetwork:
                 duration2 = all_nodes_infos[j]["duration"]
 
                 node2 = self.build_node(all_nodes_infos[j])
-                weight = min(timestamp+duration,timestamp2+duration2)-max(timestamp,timestamp2) if self.duration_weighted else 1
+                weight = min(timestamp+duration,timestamp2+duration2)-max(timestamp,timestamp2) if self.duration_weighted_intergraph else 1
                 if layer != layer2:
                     # add undirected edge
                     self.add_or_update_edge(node, node2, inter=True, weight=weight)
