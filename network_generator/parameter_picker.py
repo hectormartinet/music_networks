@@ -1,5 +1,4 @@
 import wx
-import random
 
 class ParameterPicker(wx.Frame):
     def __init__(self, parent, id, title, widgets_type, default_params, dependancy={}):
