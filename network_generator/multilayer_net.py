@@ -157,6 +157,8 @@ class MultiLayerNetwork:
         self.chord_function = params["chord_function"]
         self.group_by_beat = params["group_by_beat"]
         self.midi_files = params["midi_files"]
+        if type(self.midi_files) != list:
+            self.midi_files = [self.midi_files] 
         self.duration_weighted = True # TODO make a working parameter
         self.keep_extra = True # TODO keep supplementary info or not (for large dataset, you don't want to have this)
         self.split_chords = False # TODO make a working parameter
