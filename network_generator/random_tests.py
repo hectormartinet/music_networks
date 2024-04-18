@@ -22,21 +22,6 @@ def randomize_args():
     args["chromatic_interval"] = rand_bool()
     args["diatonic_interval"] = rand_bool()
     args["max_link_time_diff"] = rd.randint(1,16)/4
-            # "pitch":True,
-            # "octave":False,
-            # "duration":False,
-            # "rest":False,
-            # "offset":False,
-            # "offset_period":1.,
-            # "enharmony":True,
-            # "diatonic_interval":False,
-            # "chromatic_interval":False,
-            # "chord_function":False,
-            # "transpose":False,
-            # "flatten":False,
-            # "layer":True,
-            # "strict_link":False,
-            # "max_link_time_diff":4.,
     return args
 
 if __name__ == "__main__" :
