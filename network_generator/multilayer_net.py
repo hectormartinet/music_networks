@@ -9,7 +9,7 @@ import json
 import copy
 
 class MultiLayerNetwork:
-    def __init__(self, use_gui=True, verbosity=1, preset_param=None, name="No_name", **kwargs):
+    def __init__(self, use_gui=True, verbosity=1, preset_param=None, name="auto", **kwargs):
         """
         Class to create a network from midi files
 
@@ -57,29 +57,8 @@ class MultiLayerNetwork:
                 midi_files(list[str]): List of midis to use.
                 outfolder(str): Output folder for all the graphs.
         """
-        if preset_param is not None:
-            params = self.get_params(**get_preset_params(preset_param))
-        else:
-            params = self.get_params(**kwargs)
-        if use_gui:
-            params = self.pick_parameters(params)
-        self.name = name
-        self.parse_params(**params)
-        self.verbosity = verbosity
-        self.net = nx.DiGraph()
-        self.nodes_lists = []
-
-    def print_if_useful(self, message, verbosity_level):
-        if verbosity_level <= self.verbosity:
-            print(message)
-
-    def get_flatten_stream(self, layer):
-        if not self.split_chords:
-            return self.parsed_stream_list[layer]
-        return [elt for sub_lst in self.parsed_stream_list[layer] for elt in sub_lst]
-
-    def get_params(self, **kwargs):
-        default_params = {
+        # Default Parameters
+        params = {
             "pitch":True,
             "octave":False,
             "duration":False,
@@ -100,8 +79,44 @@ class MultiLayerNetwork:
             "duration_weighted_intergraph":True,
             "analyze_key":True,
             "midi_files":["midis/invent_bach/invent1.mid"],
-            "outfolder":"results/"
+            "outfolder":"results"
         }
+        if preset_param is not None:
+            params = self.get_params(params, **get_preset_params(preset_param))
+        params = self.get_params(params, **kwargs)
+        if use_gui:
+            params = self.pick_parameters(params)
+        self.parse_params(**params)
+        self.name = name 
+        if self.name == "auto":
+            self.name = self.auto_name(preset_param)
+        self.verbosity = verbosity
+        self.net = nx.DiGraph()
+        self.nodes_lists = []
+
+    def auto_name(self, preset_param=None):
+        name = ""
+        if len(self.midi_files) == 1:
+            name += os.path.splitext(os.path.basename(self.midi_files[0]))[0]
+        if preset_param is not None:
+            if name != "": name += "_"
+            name += preset_param
+  
+        if name == "":
+            return "no_name"
+        return name
+
+
+    def print_if_useful(self, message, verbosity_level):
+        if verbosity_level <= self.verbosity:
+            print(message)
+
+    def get_flatten_stream(self, layer):
+        if not self.split_chords:
+            return self.parsed_stream_list[layer]
+        return [elt for sub_lst in self.parsed_stream_list[layer] for elt in sub_lst]
+
+    def get_params(self, default_params, **kwargs):
         for key in default_params.keys():
             if key in kwargs:
                 default_params[key] = kwargs[key]
@@ -166,7 +181,7 @@ class MultiLayerNetwork:
         self.duration_weighted_intergraph = params["duration_weighted_intergraph"]
         self.keep_extra = True # TODO keep supplementary info or not (for large dataset, you don't want to have this)
         self.split_chords = params["split_chords"]
-        self.analyze_key = params["analyze_key"] and not self.transpose
+        self.analyze_key = params["analyze_key"] or self.transpose or self.chord_function
         for file_name in self.midi_files:
             assert(os.path.splitext(file_name)[1] in [".mid", ".musicxml"])
         self.outfolder = params["outfolder"]
@@ -539,7 +554,7 @@ if __name__ == "__main__" :
     output_folder = 'results/'  # Replace with your desired output folder
     
     # Create the MultiLayerNetwork object with the MIDI file and output folder
-    net1 = MultiLayerNetwork(use_gui=True, output_folder=output_folder, name="test", preset_param="serra")
+    net1 = MultiLayerNetwork(use_gui=True, outfolder=output_folder, preset_param="serra")
 
     # Call createNet function
     net1.create_net()
