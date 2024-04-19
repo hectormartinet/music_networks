@@ -56,7 +56,8 @@ class MultiLayerNetwork:
                 - group_by_beat(bool): Group the notes of each part by beat and set durations to 1. Defaults to False.
 
             Input/Output parameters:
-                - midi_files(list[str]): List of midis to use.
+                - midi_files(list[str]): 
+                  of midis to use.
                 - outfolder(str): Output folder for all the graphs.
         """
         # Default Parameters
@@ -430,7 +431,6 @@ class MultiLayerNetwork:
         else:
             self.net.add_edge(from_node, to_node, weight=weight, inter=inter)
 
-# TODO : change net to nets/agregate_net or do the conversion automatically
     def convert_attributes_to_str(self):
         """
         Necessary step before exporting graph.
@@ -443,9 +443,8 @@ class MultiLayerNetwork:
     def default_filepath(self, extension):
         return self.outfolder + self.name + extension
 
-# TODO : change net to nets/ aggregate net
     def export_net(self, file_path=None):
-        """Export the network to a graphml file
+        """Export the current working network to a graphml file
 
         Args:
             filename (string): Output filename
@@ -455,8 +454,8 @@ class MultiLayerNetwork:
         self.print_if_useful("[+] Writing main graphml file to : " + file_path, 1)
         nx.write_graphml(self.net, file_path)
 
-    def export_sub_net(self, folder=None, filename=None):
-        """Export the subnet to a graphml file
+    def export_sub_nets(self, folder=None, filename=None):
+        """Export the current working subnets to a graphml file
 
         Args:
             folder (string): Output folder
@@ -526,13 +525,11 @@ class MultiLayerNetwork:
         """
         return self.net
 
-
-# TODO : Change to nets/ agregate_net
     def get_sub_net(self):
-        """Build and return the list of subnetworks
+        """Build and return the list of subnetworks of the current working
 
         Returns:
-            List NetworkX: The list of subnetworks
+            list[NetworkX]: The list of subnetworks
         """
         if not self.layer:
             return self.net, nx.DiGraph()
@@ -614,7 +611,7 @@ if __name__ == "__main__" :
     net1.export_net()
 
     # Export subnets
-    net1.export_sub_net()
+    net1.export_sub_nets()
     
     # Export node list
     net1.export_nodes_list()
