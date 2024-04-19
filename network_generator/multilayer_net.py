@@ -9,7 +9,8 @@ import json
 import copy
 
 class MultiLayerNetwork:
-    def __init__(self, use_gui=True, verbosity=1, preset_param=None, name="auto", **params):
+    # TODO keep documentation up to date
+    def __init__(self, use_gui=True, verbosity=1, preset_param=None, name="auto", **kwargs):
         """
         Class to create a network from midi files
 
@@ -28,34 +29,35 @@ class MultiLayerNetwork:
                 "frottier"
                 "mrad_melodic"
                 "mrad_harmonic"
-            name(str, optional): Give a name to your network !
+            name(str, optional): Name of the network. Is used to generate the name of the output files when needed.\
+                by default is on 'auto' which tries to figure out a name based on midi_file and/or preset parameter
             
             [**kwargs]: all network parameters(all optional with a default value)
             Node parameters: Booleans to know which values are hold by the nodes.
-                pitch(bool): Pitch of the note disregarding octave. Defaults to True.
-                octave(bool): Octave of the note. Defaults to False.
-                duration(bool): Duration of the note in quarter notes. Defaults to False.
-                offset(bool), offset_period(float): The offset of the note modulo the offset_period. Defaults to False, 1.
-                chromatic_interval(bool): Chromatic interval with the next note. Defaults to False.
-                diatonic_interval(bool): Diatonic interval with the next note. Defaults to False.
-                chord_function(bool): Give the corresponding degree of the chord
+                - pitch(bool): Pitch of the note disregarding octave. Defaults to True.
+                - octave(bool): Octave of the note. Defaults to False.
+                - duration(bool): Duration of the note in quarter notes. Defaults to False.
+                - offset(bool), offset_period(float): The offset of the note modulo the offset_period. Defaults to False, 1.
+                - chromatic_interval(bool): Chromatic interval with the next note. Defaults to False.
+                - diatonic_interval(bool): Diatonic interval with the next note. Defaults to False.
+                - chord_function(bool): Give the corresponding degree of the chord
 
             Edge parameters: To know when two nodes are linked
-                strict_link(bool): Only link nodes from different layers when the corresponding notes play at the same time \
+                - strict_link(bool): Only link nodes from different layers when the corresponding notes play at the same time \
                     otherwise link nodes if the corresponding note play together at some point. Defaults to False.
-                max_link_time_diff(float): Maximal time difference in quarter notes between two consecutive notes \
+                - max_link_time_diff(float): Maximal time difference in quarter notes between two consecutive notes \
                     (i.e. just separated by rests) for them to be linked. Defaults to 4.
 
             General structure parameters: Describe the general behaviour of the network
-                layer(bool): Create a network with a layer for every part. Defaults to True.
-                transpose(bool): Transpose the song in C major/ A minor depending on the mode based on the starting tonality. Defaults to False.
-                flatten(bool): Flatten the song and treat everything as one part.
-                enharmony(bool): Treat equivalent notes (e.g. C# and Db) as the same note. Defaults to True.
-                group_by_beat(bool): Group the notes of each part by beat and set durations to 1. Defaults to False.
+                - layer(bool): Create a network with a layer for every part. Defaults to True.
+                - transpose(bool): Transpose the song in C major/ A minor depending on the mode based on the starting tonality. Defaults to False.
+                - flatten(bool): Flatten the song and treat everything as one part.
+                - enharmony(bool): Treat equivalent notes (e.g. C# and Db) as the same note. Defaults to True.
+                - group_by_beat(bool): Group the notes of each part by beat and set durations to 1. Defaults to False.
 
             Input/Output parameters:
-                midi_files(list[str]): List of midis to use.
-                outfolder(str): Output folder for all the graphs.
+                - midi_files(list[str]): List of midis to use.
+                - outfolder(str): Output folder for all the graphs.
         """
         # Default Parameters
         params = {
@@ -83,15 +85,30 @@ class MultiLayerNetwork:
         }
         if preset_param is not None:
             self.overwrite_params(params, **get_preset_params(preset_param))
-        self.overwrite_params(params, **params)
+        self.overwrite_params(params, **kwargs)
         if use_gui:
             params = self.pick_parameters(params)
         self.parse_params(**params)
         self.name = name 
         if self.name == "auto":
+            self.auto_naming = True
             self.name = self.auto_name(preset_param)
         self.verbosity = verbosity
         self.net = nx.DiGraph()
+        """NetworkX: Current working net"""
+        
+        self.sub_net = []
+        """list[NetworkX: Sub nets of the current working net]"""
+
+        self.intergraph = None
+        """NetworkX: Intergraph of the current working network"""
+
+        self.separate_nets = {}
+        """dict{str:NetworkX}: All networks generated from each midi file by name"""
+
+        self.agregated_net = nx.DiGraph()
+        """NetworkX: Agregated network from every midi file"""
+
         self.nodes_lists = []
 
     def auto_name(self, preset_param=None):
@@ -126,11 +143,9 @@ class MultiLayerNetwork:
         return par_pick.get_parameters(params)
 
     def load_new_midi(self, midifilename):
-        self.sub_net = []
         self.stream_list = []
         self.parsed_stream_list = []
         self.instruments = []
-        self.intergraph = None
         self.midi_file = midifilename
         self.print_if_useful("Loading new midi : " + midifilename, 2)
         whole_piece = ms.converter.parse(midifilename, quarterLengthDivisors = (16,))
@@ -177,7 +192,7 @@ class MultiLayerNetwork:
         self.group_by_beat = params["group_by_beat"]
         self.midi_files = params["midi_files"]
         if type(self.midi_files) != list:
-            self.midi_files = [self.midi_files] 
+            self.midi_files = [self.midi_files]
         self.duration_weighted_intergraph = params["duration_weighted_intergraph"]
         self.keep_extra = True # TODO keep supplementary info or not (for large dataset, you don't want to have this)
         self.split_chords = params["split_chords"]
@@ -415,6 +430,7 @@ class MultiLayerNetwork:
         else:
             self.net.add_edge(from_node, to_node, weight=weight, inter=inter)
 
+# TODO : change net to nets/agregate_net or do the conversion automatically
     def convert_attributes_to_str(self):
         """
         Necessary step before exporting graph.
@@ -427,6 +443,7 @@ class MultiLayerNetwork:
     def default_filepath(self, extension):
         return self.outfolder + self.name + extension
 
+# TODO : change net to nets/ aggregate net
     def export_net(self, file_path=None):
         """Export the network to a graphml file
 
@@ -461,25 +478,56 @@ class MultiLayerNetwork:
         cur_out = filename + "_intergraph.graphml"
         nx.write_graphml(self.intergraph, cur_out)
 
-    def create_net(self):
+    def create_net(self, separate_graphs=False):
         """Create the main network
+            Args:
+                - separate_graphs(bool): If set to True, create a net for every midi file, else create only one net where everything is agregated
         """
         nb_files = len(self.midi_files)
+        if nb_files <= 1: separate_graphs = False
+
         self.print_if_useful("[+] Converting " + str(nb_files) + " MIDI file(s) to network", 1)
         pbar = tqdm(total=nb_files)
-        for midi in self.midi_files:
-            self.load_new_midi(midi)
+        self.net = nx.DiGraph()
+        self.separate_nets = {}
+        for midi_file_path in self.midi_files:
+            self.load_new_midi(midi_file_path)
             self.stream_to_network()
+            if separate_graphs:
+                name = os.path.splitext(os.path.basename(midi_file_path))[0]
+                self.separate_nets[name] = self.net
+                self.net = nx.DiGraph()
             pbar.update(1)
+        if not separate_graphs:
+            self.agregated_net = self.net
 
-    def get_net(self):
-        """Getter for the network
+
+    def get_agregated_net(self):
+        """Getter for the agregated network
 
         Returns:
             NetworkX: The main network
         """
-        return self.net
+        return self.agregated_net
     
+    def get_separate_nets(self):
+        """Getter for the separated networks
+
+        Returns:
+            dict{str: NetworkX}: all networks by name
+        """
+        return self.separate_nets
+    
+    def get_net(self):
+        """Getter for the current working net
+
+        Returns:
+            NetworkX: Current working net
+        """
+        return self.net
+
+
+# TODO : Change to nets/ agregate_net
     def get_sub_net(self):
         """Build and return the list of subnetworks
 
@@ -493,9 +541,8 @@ class MultiLayerNetwork:
         for i in range(s_len):
             def filter(node, layer=i): return self.net.nodes[node]["layer"]==layer # use default arg to avoid dependancy on i
             self.sub_net.append(nx.subgraph_view(self.net, filter_node=filter))
-        # TODO make intergraph work
         def filter(node1,node2): return self.net[node1][node2]["inter"]
-        self.intergraph = nx.subgraph_view(self.net, filter_edge=filter)#.to_undirected()
+        self.intergraph = nx.subgraph_view(self.net, filter_edge=filter)
         return self.sub_net, self.intergraph
     
     def get_nodes_list(self, layer=0):

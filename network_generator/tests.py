@@ -84,7 +84,8 @@ class MultilayerNetworkTester:
         stream.write("musicxml",file_path)
 
         # With enharmony
-        net = MultiLayerNetwork(use_gui=False, verbosity=0, midi_files = [file_path], enharmony=True)
+        self.current_test = "enharmony(True)"
+        net = MultiLayerNetwork(use_gui=False, verbosity=0, midi_files=file_path, enharmony=True)
         net.create_net()
         graph = net.get_net()
         exp_graph = nx.DiGraph()
@@ -95,7 +96,8 @@ class MultilayerNetworkTester:
         self.assert_graph_match(graph, exp_graph)
 
         # Without enharmony
-        net = MultiLayerNetwork(use_gui=False, verbosity=0, midi_files = [file_path], enharmony=False)
+        self.current_test = "enharmony(False)"
+        net = MultiLayerNetwork(use_gui=False, verbosity=0, midi_files=file_path, enharmony=False)
         net.create_net()
         graph = net.get_net()
         exp_graph = nx.DiGraph()
@@ -127,7 +129,7 @@ class MultilayerNetworkTester:
         stream.write("midi",file_path)
 
         # Create net
-        net = MultiLayerNetwork(use_gui=False, verbosity=0, midi_files = [file_path], pitch=False, chord_function=True)
+        net = MultiLayerNetwork(use_gui=False, verbosity=0, midi_files=file_path, pitch=False, chord_function=True)
         net.create_net()
         graph = net.get_net()
 
@@ -144,7 +146,8 @@ class MultilayerNetworkTester:
     def test_group_by_beat(self):
         """
         Test group_by_beat parameter:
-            - Notes from the same beat should end up in the same
+            - Notes from the same beat should end up in the same chord
+            - Within a beat, different order of notes should give the same node
         """
         self.current_test = "group_by_beat"
 
@@ -154,7 +157,7 @@ class MultilayerNetworkTester:
         stream.write("midi", file_path)
 
         # Create net
-        net = MultiLayerNetwork(use_gui=False, verbosity=0, midi_files = [file_path], group_by_beat=True)
+        net = MultiLayerNetwork(use_gui=False, verbosity=0, midi_files=file_path, group_by_beat=True)
         net.create_net()
         graph = net.get_net()
 
@@ -169,6 +172,24 @@ class MultilayerNetworkTester:
         exp_graph.add_edge(node1, node2, weight=1)
         exp_graph.add_edge(node2, node1, weight=1)
         self.assert_graph_match(graph, exp_graph)
+
+    def test_pitch(self):
+        """
+        Test pitch parameter:
+            - Notes with same pitch but different octaves, duration... should give the same node
+        """
+        self.current_test = "pitch"
+
+        # Create midi file
+        stream = ms.converter.parse("tinyNotation: c8 C4 E8 e2")
+        file_path = self.test_folder + "pitch.mid"
+        stream.write("midi", file_path)
+
+        # Create net
+        net = MultiLayerNetwork(use_gui=False, verbosity=0, midi_files=file_path)
+        net.create_net()
+        graph = net.get_net()
+
 
 
 if __name__ == "__main__":

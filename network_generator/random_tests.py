@@ -26,12 +26,11 @@ def randomize_args():
 
 if __name__ == "__main__" :
     input_file_path = 'midis/invent_bach/invent1.mid'  # Replace with your MIDI file path
-    output_folder = 'tests_temp'  # Replace with your desired output folder
+    output_folder = 'random_tests'  # Replace with your desired output folder
 
     n=10
     if len(sys.argv) > 1:
         n=int(sys.argv[1])
-    print(n)
     for i in range(n):
 
         args = randomize_args()
