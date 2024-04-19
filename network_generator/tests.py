@@ -57,8 +57,8 @@ class MultilayerNetworkTester:
         net = MultiLayerNetwork(use_gui=False,verbosity=0,**params)
         net.create_net()
         net.get_net()
-        net.get_sub_net()
-        net.get_nodes_list()
+        net._get_sub_nets()
+        net._get_nodes_list()
         net1.convert_attributes_to_str()
     
     def make_test_folder(self):
@@ -204,6 +204,11 @@ class MultilayerNetworkTester:
         exp_graph.add_edge(node2, node2, weight=1)
         self.assert_graph_match(graph, exp_graph)
 
+    def test_octave(self):
+        """
+        Test octave parameter:
+            - Notes with same pitch but different octaves should give different nodes
+        """
 
 if __name__ == "__main__":
     tester = MultilayerNetworkTester()

@@ -192,13 +192,10 @@ if __name__ == "__main__":
     net.create_net()
     net2.create_net()
 
-    # Get the subnet and intergraph
-    net.get_sub_net()
-    net2.get_sub_net()
     generator = MusicGenerator("")
     # generator.weighted_rw(net.sub_net[0])
-    generator.nodes_lists.append(net2.get_nodes_list(0))
+    generator.nodes_lists.append(net2._get_nodes_list(0))
     generator.part_list.append(ms.stream.Part([generator.node_to_note(node) for node in generator.nodes_lists[-1]]))
-    for i in range(1,len(net.sub_net)):
-        generator.add_voice_with_rw(net.sub_net[i], net.intergraph, alpha=1, beta=1)
+    for i in range(1,len(net.aggregated_sub_nets)):
+        generator.add_voice_with_rw(net.aggregated_sub_nets[i], net.aggregated_intergraph, alpha=1, beta=1)
     generator.show_music()
