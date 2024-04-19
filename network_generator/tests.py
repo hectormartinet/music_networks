@@ -41,6 +41,7 @@ class MultilayerNetworkTester:
             self.test_enharmony()
             self.test_chord_function()
             self.test_group_by_beat()
+            self.test_pitch()
         except Exception as err:
             print(f"Unit tests {self.current_test} failed, error :")
             print(err)
@@ -190,6 +191,18 @@ class MultilayerNetworkTester:
         net.create_net()
         graph = net.get_net()
 
+        # Create expected graph
+        note1 = ms.note.Note("C")
+        note2 = ms.note.Note("E")
+        node1 = net.build_node(net.parse_elt(note1))
+        node2 = net.build_node(net.parse_elt(note2))
+        exp_graph = nx.DiGraph()
+        exp_graph.add_node(node1, weight=2, pitch_class="C")
+        exp_graph.add_node(node2, weight=2, pitch_class="E")
+        exp_graph.add_edge(node1, node1, weight=1)
+        exp_graph.add_edge(node1, node2, weight=1)
+        exp_graph.add_edge(node2, node2, weight=1)
+        self.assert_graph_match(graph, exp_graph)
 
 
 if __name__ == "__main__":
