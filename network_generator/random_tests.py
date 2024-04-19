@@ -63,7 +63,7 @@ if __name__ == "__main__" :
             net1.export_net(os.path.join(subfolder_path, output_filename))
 
             # Export subnets
-            net1.export_sub_net(os.path.join(output_folder, os.path.splitext(os.path.basename(input_file_path))[0]) + os.path.sep, os.path.splitext(os.path.basename(input_file_path))[0])
+            net1.export_sub_nets(os.path.join(output_folder, os.path.splitext(os.path.basename(input_file_path))[0]) + os.path.sep, os.path.splitext(os.path.basename(input_file_path))[0])
         except Exception as e:
             print(e)
             print(args)
