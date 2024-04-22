@@ -284,10 +284,8 @@ class MultilayerNetworkTester:
         graph = net.get_net()
 
         # Create expected graph
-        note1 = ms.note.Note()
-        note1.quarterLength = 0.5
-        note2 = ms.note.Note()
-        note2.quarterLength = 1
+        note1 = ms.note.Note(quarterLength=0.5)
+        note2 = ms.note.Note(quarterLength=1)
         node1 = net.build_node(net.parse_elt(note1))
         node2 = net.build_node(net.parse_elt(note2))
         exp_graph = nx.DiGraph()
@@ -459,7 +457,54 @@ class MultilayerNetworkTester:
 
     def test_layer(self):
         self.current_test = "layer"
-        raise Exception("Test not implemented yet")
+        
+        # Create midi file, tinyNotation does not work when using multiple parts
+        part1 = ms.stream.Part()
+        part1.append(ms.note.Note("E"))
+        part1.append(ms.note.Note("C"))
+        part2 = ms.stream.Part()
+        part2.append(ms.note.Note("C", quarterLength=0.5))
+        part2.append(ms.note.Note("D", quarterLength=0.5))
+        part2.append(ms.note.Note("E"))
+        stream = ms.stream.Stream([part1, part2])
+        file_path = self.test_folder + self.current_test + ".mid"
+        stream.write("midi", file_path)
+
+        # Create net
+        net = MultiLayerNetwork(use_gui=False, verbosity=0, midi_files=file_path, layer=True, duration_weighted_intergraph = False)
+        net.create_net()
+        graph = net._get_intergraph(net.net)
+
+        # Create expected graph
+        parsed_elt0_1 = net.parse_elt(ms.note.Note("E"))
+        parsed_elt0_1["layer"] = 0
+        parsed_elt0_2 = net.parse_elt(ms.note.Note("C"))
+        parsed_elt0_2["layer"] = 0
+        parsed_elt1_1 = net.parse_elt(ms.note.Note("C"))
+        parsed_elt1_1["layer"] = 1
+        parsed_elt1_2 = net.parse_elt(ms.note.Note("D"))
+        parsed_elt1_2["layer"] = 1
+        parsed_elt1_3 = net.parse_elt(ms.note.Note("E"))
+        parsed_elt1_3["layer"] = 1
+        node0_1 = net.build_node(parsed_elt0_1)
+        node0_2 = net.build_node(parsed_elt0_2)
+        node1_1 = net.build_node(parsed_elt1_1)
+        node1_2 = net.build_node(parsed_elt1_2)
+        node1_3 = net.build_node(parsed_elt1_3)
+        exp_graph = nx.DiGraph()
+        exp_graph.add_node(node0_1, weight=1, pitch_class="E")
+        exp_graph.add_node(node0_2, weight=1, pitch_class="C")
+        exp_graph.add_node(node1_1, weight=1, pitch_class="C")
+        exp_graph.add_node(node1_2, weight=1, pitch_class="D")
+        exp_graph.add_node(node1_3, weight=1, pitch_class="E")
+        exp_graph.add_edge(node0_1, node1_1, weight=1)
+        exp_graph.add_edge(node1_1, node0_1, weight=1)
+        exp_graph.add_edge(node0_1, node1_2, weight=1)
+        exp_graph.add_edge(node1_2, node0_1, weight=1)
+        exp_graph.add_edge(node0_2, node1_3, weight=1)
+        exp_graph.add_edge(node1_3, node0_2, weight=1)
+
+        self.assert_graph_match(graph, exp_graph)
     
     def test_flatten(self):
         self.current_test = "flatten"
@@ -518,7 +563,57 @@ class MultilayerNetworkTester:
     
     def test_duration_weighted_intergraph(self):
         self.current_test = "duration_weighted_intergraph"
-        raise Exception("Test not implemented yet")
+
+        # Create midi file, tinyNotation does not work when using multiple parts
+        part1 = ms.stream.Part()
+        part1.append(ms.note.Note("E"))
+        part1.append(ms.note.Note("C", quarterLength=2))
+        part2 = ms.stream.Part()
+        part2.append(ms.note.Note("C", quarterLength=0.5))
+        part2.append(ms.note.Note("D", quarterLength=2))
+        part2.append(ms.note.Note("E", quarterLength=0.5))
+        stream = ms.stream.Stream([part1, part2])
+        file_path = self.test_folder + self.current_test + ".mid"
+        stream.write("midi", file_path)
+
+        # Create net
+        net = MultiLayerNetwork(use_gui=False, verbosity=0, midi_files=file_path, layer=True, duration_weighted_intergraph=True)
+        net.create_net()
+        graph = net._get_intergraph(net.net)
+
+        # Create expected graph
+        parsed_elt0_1 = net.parse_elt(ms.note.Note("E"))
+        parsed_elt0_1["layer"] = 0
+        parsed_elt0_2 = net.parse_elt(ms.note.Note("C"))
+        parsed_elt0_2["layer"] = 0
+        parsed_elt1_1 = net.parse_elt(ms.note.Note("C"))
+        parsed_elt1_1["layer"] = 1
+        parsed_elt1_2 = net.parse_elt(ms.note.Note("D"))
+        parsed_elt1_2["layer"] = 1
+        parsed_elt1_3 = net.parse_elt(ms.note.Note("E"))
+        parsed_elt1_3["layer"] = 1
+        node0_1 = net.build_node(parsed_elt0_1)
+        node0_2 = net.build_node(parsed_elt0_2)
+        node1_1 = net.build_node(parsed_elt1_1)
+        node1_2 = net.build_node(parsed_elt1_2)
+        node1_3 = net.build_node(parsed_elt1_3)
+        exp_graph = nx.DiGraph()
+        exp_graph.add_node(node0_1, weight=1, pitch_class="E")
+        exp_graph.add_node(node0_2, weight=1, pitch_class="C")
+        exp_graph.add_node(node1_1, weight=1, pitch_class="C")
+        exp_graph.add_node(node1_2, weight=1, pitch_class="D")
+        exp_graph.add_node(node1_3, weight=1, pitch_class="E")
+        exp_graph.add_edge(node0_1, node1_1, weight=0.5)
+        exp_graph.add_edge(node1_1, node0_1, weight=0.5)
+        exp_graph.add_edge(node0_1, node1_2, weight=0.5)
+        exp_graph.add_edge(node1_2, node0_1, weight=0.5)
+        exp_graph.add_edge(node0_2, node1_2, weight=1.5)
+        exp_graph.add_edge(node1_2, node0_2, weight=1.5)
+        exp_graph.add_edge(node0_2, node1_3, weight=0.5)
+        exp_graph.add_edge(node1_3, node0_2, weight=0.5)
+
+        self.assert_graph_match(graph, exp_graph)
+    
     
     def test_analyze_key(self):
         self.current_test = "analyze_key"
@@ -527,4 +622,6 @@ class MultilayerNetworkTester:
 if __name__ == "__main__":
     tester = MultilayerNetworkTester()
     tester.run_unit_tests()
+    # tester.make_test_folder()
+    # tester.test_layer()
     
