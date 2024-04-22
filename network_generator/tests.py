@@ -425,7 +425,52 @@ class MultilayerNetworkTester:
             - When strict_link is True, two nodes from different layers link iff the nodes play exactly at the same time.
         """
         self.current_test = "strict_link"
-        raise Exception("Test not implemented yet")
+
+        # Create midi file, tinyNotation does not work when using multiple parts
+        part1 = ms.stream.Part()
+        part1.append(ms.note.Note("E"))
+        part1.append(ms.note.Note("C"))
+        part2 = ms.stream.Part()
+        part2.append(ms.note.Note("C", quarterLength=0.5))
+        part2.append(ms.note.Note("D", quarterLength=0.5))
+        part2.append(ms.note.Note("E"))
+        stream = ms.stream.Stream([part1, part2])
+        file_path = self.test_folder + self.current_test + ".mid"
+        stream.write("midi", file_path)
+
+        # Create net
+        net = MultiLayerNetwork(use_gui=False, verbosity=0, midi_files=file_path, layer=True, duration_weighted_intergraph=False, strict_link=True)
+        net.create_net()
+        graph = net._get_intergraph(net.net)
+
+        # Create expected graph
+        parsed_elt0_1 = net.parse_elt(ms.note.Note("E"))
+        parsed_elt0_1["layer"] = 0
+        parsed_elt0_2 = net.parse_elt(ms.note.Note("C"))
+        parsed_elt0_2["layer"] = 0
+        parsed_elt1_1 = net.parse_elt(ms.note.Note("C"))
+        parsed_elt1_1["layer"] = 1
+        parsed_elt1_2 = net.parse_elt(ms.note.Note("D"))
+        parsed_elt1_2["layer"] = 1
+        parsed_elt1_3 = net.parse_elt(ms.note.Note("E"))
+        parsed_elt1_3["layer"] = 1
+        node0_1 = net.build_node(parsed_elt0_1)
+        node0_2 = net.build_node(parsed_elt0_2)
+        node1_1 = net.build_node(parsed_elt1_1)
+        node1_2 = net.build_node(parsed_elt1_2)
+        node1_3 = net.build_node(parsed_elt1_3)
+        exp_graph = nx.DiGraph()
+        exp_graph.add_node(node0_1, weight=1, pitch_class="E")
+        exp_graph.add_node(node0_2, weight=1, pitch_class="C")
+        exp_graph.add_node(node1_1, weight=1, pitch_class="C")
+        exp_graph.add_node(node1_2, weight=1, pitch_class="D")
+        exp_graph.add_node(node1_3, weight=1, pitch_class="E")
+        exp_graph.add_edge(node0_1, node1_1, weight=1)
+        exp_graph.add_edge(node1_1, node0_1, weight=1)
+        exp_graph.add_edge(node0_2, node1_3, weight=1)
+        exp_graph.add_edge(node1_3, node0_2, weight=1)
+
+        self.assert_graph_match(graph, exp_graph)
 
     def test_max_link_time_diff(self):
         """
@@ -508,15 +553,117 @@ class MultilayerNetworkTester:
     
     def test_flatten(self):
         self.current_test = "flatten"
-        raise Exception("Test not implemented yet")
+
+        # Create midi file, tinyNotation does not work when using multiple parts
+        part1 = ms.stream.Part()
+        part1.append(ms.note.Note("C"))
+        part1.append(ms.note.Note("B"))
+        part2 = ms.stream.Part()
+        part2.append(ms.note.Note("E", quarterLength=0.5))
+        part2.append(ms.note.Note("F#"))
+        part2.append(ms.note.Note("G", quarterLength=0.5))
+        stream = ms.stream.Stream([part1, part2])
+        file_path = self.test_folder + self.current_test + ".mid"
+        stream.write("midi", file_path)
+
+        # Create net
+        net = MultiLayerNetwork(use_gui=False, verbosity=0, midi_files=file_path, layer=False, flatten=True, duration=True)
+        net.create_net()
+        graph = net.get_net()
+
+        # Create expected graph
+        chord1 = ms.chord.Chord("C E", quarterLength=0.5)
+        chord2 = ms.chord.Chord("C F#", quarterLength=0.5)
+        chord3 = ms.chord.Chord("F# B", quarterLength=0.5)
+        chord4 = ms.chord.Chord("G B", quarterLength=0.5)
+        node1 = net.build_node(net.parse_elt(chord1))
+        node2 = net.build_node(net.parse_elt(chord2))
+        node3 = net.build_node(net.parse_elt(chord3))
+        node4 = net.build_node(net.parse_elt(chord4))
+        exp_graph = nx.DiGraph()
+        exp_graph.add_node(node1, weight=1, pitch_class="C E", duration=0.5)
+        exp_graph.add_node(node2, weight=1, pitch_class="C F#", duration=0.5)
+        exp_graph.add_node(node3, weight=1, pitch_class="F# B", duration=0.5)
+        exp_graph.add_node(node4, weight=1, pitch_class="G B", duration=0.5)
+        exp_graph.add_edge(node1, node2, weight=1)
+        exp_graph.add_edge(node2, node3, weight=1)
+        exp_graph.add_edge(node3, node4, weight=1)
+
+        self.assert_graph_match(graph, exp_graph)
+
     
     def test_diatonic_interval(self):
+        """
+        Test diatonic_interval parameter:
+            - Diatonic intervals disregards accidentals, so the enharmonic version of C major : C D## G should not give the same result
+            - Descending intervals should have negative value
+        """
         self.current_test = "diatonic_interval"
-        raise Exception("Test not implemented yet")
+
+        # Create midi file
+        stream = ms.converter.parse("tinyNotation: C E## D-")
+        file_path = self.test_folder + self.current_test + ".musicxml"
+        stream.write("musicxml", file_path)
+
+        # Create net
+        net = MultiLayerNetwork(use_gui=False, verbosity=0, midi_files=file_path, diatonic_interval=True, enharmony=False)
+        net.create_net()
+        graph = net.get_net()
+
+        # Create expected graph
+        note1 = ms.note.Note("C")
+        note2 = ms.note.Note("E##")
+        note3 = ms.note.Note("D-")
+        parsed_elt1 = net.parse_elt(note1)
+        parsed_elt1["diatonic_interval"] = 3
+        parsed_elt2 = net.parse_elt(note2)
+        parsed_elt2["diatonic_interval"] = -2
+        parsed_elt3 = net.parse_elt(note3)
+        parsed_elt3["diatonic_interval"] = 0
+        node1 = net.build_node(parsed_elt1)
+        node2 = net.build_node(parsed_elt2)
+        node3 = net.build_node(parsed_elt3)
+        exp_graph = nx.DiGraph()
+        exp_graph.add_node(node1, weight=1, pitch_class="C", diatonic_interval = 3)
+        exp_graph.add_node(node2, weight=1, pitch_class="E##", diatonic_interval = -2)
+        exp_graph.add_node(node3, weight=1, pitch_class="D-", diatonic_interval = 0)
+        exp_graph.add_edge(node1, node2, weight=1)
+        exp_graph.add_edge(node2, node3, weight=1)
+        self.assert_graph_match(graph, exp_graph)
+
 
     def test_chromatic_interval(self):
         self.current_test = "chromatic_interval"
-        raise Exception("Test not implemented yet")
+        # Create midi file
+        stream = ms.converter.parse("tinyNotation: C E E-")
+        file_path = self.test_folder + self.current_test + ".mid"
+        stream.write("midi", file_path)
+
+        # Create net
+        net = MultiLayerNetwork(use_gui=False, verbosity=0, midi_files=file_path, chromatic_interval=True)
+        net.create_net()
+        graph = net.get_net()
+
+        # Create expected graph
+        note1 = ms.note.Note("C")
+        note2 = ms.note.Note("E")
+        note3 = ms.note.Note("E-")
+        parsed_elt1 = net.parse_elt(note1)
+        parsed_elt1["chromatic_interval"] = 4
+        parsed_elt2 = net.parse_elt(note2)
+        parsed_elt2["chromatic_interval"] = -1
+        parsed_elt3 = net.parse_elt(note3)
+        parsed_elt3["chromatic_interval"] = 0
+        node1 = net.build_node(parsed_elt1)
+        node2 = net.build_node(parsed_elt2)
+        node3 = net.build_node(parsed_elt3)
+        exp_graph = nx.DiGraph()
+        exp_graph.add_node(node1, weight=1, pitch_class="C", chromatic_interval = 4)
+        exp_graph.add_node(node2, weight=1, pitch_class="E", chromatic_interval = -1)
+        exp_graph.add_node(node3, weight=1, pitch_class="E-", chromatic_interval = 0)
+        exp_graph.add_edge(node1, node2, weight=1)
+        exp_graph.add_edge(node2, node3, weight=1)
+        self.assert_graph_match(graph, exp_graph)
     
     def test_split_chords(self):
         """
@@ -617,11 +764,32 @@ class MultilayerNetworkTester:
     
     def test_analyze_key(self):
         self.current_test = "analyze_key"
-        raise Exception("Test not implemented yet")
+        
+        # Create midi file
+        stream = ms.converter.parse("tinyNotation: C D E") # does not matter
+        file_path = self.test_folder + self.current_test + ".mid"
+        stream.write("midi", file_path)
+
+        # Without analysis
+        self.current_test = "analyze_key(False)"
+        
+        # Create net
+        net = MultiLayerNetwork(use_gui=False, verbosity=0, midi_files=file_path, analyze_key=False)
+        net.create_net()
+        if net.original_key is not None:
+            raise Exception("analyze_key=False, but the analysis has been done")
+        
+        # Without analysis
+        self.current_test = "analyze_key(False)"
+
+        # Create net
+        net = MultiLayerNetwork(use_gui=False, verbosity=0, midi_files=file_path, analyze_key=True)
+        net.create_net()
+        if net.original_key is None:
+            raise Exception("analyze_key=True, but the analysis has not been done")
+
     
 if __name__ == "__main__":
     tester = MultilayerNetworkTester()
     tester.run_unit_tests()
-    # tester.make_test_folder()
-    # tester.test_layer()
     
