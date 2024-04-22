@@ -43,8 +43,10 @@ nardelli_params = {
 }
 
 # Kulkarni et al.
+# TODO check if everything is ok
 # Post processing needed to split chords and relink nodes (+ remove self-loops)
 kulkarni_params = {
+    "split_chord":True,
     "pitch":True,
     "octave":True,
     "enharmony":True, # I guess ?

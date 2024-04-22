@@ -148,6 +148,8 @@ class MultiLayerNetwork:
         self.stream_list = []
         self.parsed_stream_list = []
         self.instruments = []
+        self.original_key = None
+        self.key = None
         self.midi_file = midifilename
         self._print_if_useful("Loading new midi : " + midifilename, 2)
         whole_piece = ms.converter.parse(midifilename, quarterLengthDivisors = (16,))
@@ -343,7 +345,7 @@ class MultiLayerNetwork:
             self._add_or_update_node(node, elt)
             if prev_elt is not None:
                 time_diff = elt["timestamp"] - prev_elt["timestamp"] - prev_elt["duration"]
-                if time_diff <= self.max_link_time_diff:
+                if time_diff <= self.max_link_time_diff: # TODO decide if the comparison should be strict (and change test accordingly)
                     self._add_or_update_edge(prev_node, node, inter=False)
             prev_node = node
             prev_elt = elt
@@ -551,7 +553,7 @@ class MultiLayerNetwork:
         return sub_nets
     
     def _get_intergraph(self, net):
-        """Build and return the intergraph of the current working network
+        """Build and return the intergraph of the input net
 
         Returns:
             list[NetworkX]: The list of subnetworks
@@ -609,7 +611,7 @@ class MultiLayerNetwork:
                 current_beat += 1
             self.stream_list.append(new_stream)
 
-    def export_nets(self, types=["main_net"]):
+    def export_nets(self, types=["main_net","sub_net"]):
         """
         Export previously created nets.
 
@@ -652,4 +654,4 @@ if __name__ == "__main__" :
     net1.create_net(separate_graphs=True)
     
     # Export nets ('all' = main nets + subnets + intergraphs)
-    net1.export_nets(types='all')
+    net1.export_nets()
