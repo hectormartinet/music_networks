@@ -112,6 +112,10 @@ class MultiLayerNetwork:
         self.aggregated_intergraph = None
 
         self.nodes_lists = []
+        try:
+            os.makedirs(self.outfolder)
+        except:
+            pass
 
     def _auto_name(self, preset_param=None):
         name = ""
@@ -209,6 +213,9 @@ class MultiLayerNetwork:
     
     @property
     def interval(self): return self.diatonic_interval or self.chromatic_interval
+
+    @property
+    def nb_layers(self): return len(self.stream_list)
 
     def _stream_to_C(self, part):
         if self.original_key.mode == "major":
@@ -327,7 +334,7 @@ class MultiLayerNetwork:
             return pitch.name 
     
     def _stream_to_network(self):
-        s_len = len(self.stream_list)
+        s_len = self.nb_layers
         self._print_if_useful("[+] Creating network - Intra-layer processing", 2)
 
         for i in range(s_len):  # For each instrument
@@ -366,8 +373,8 @@ class MultiLayerNetwork:
             prev_elts = elts
     
     def _process_inter_layer(self):
-        s_len = len(self.stream_list)
-        all_nodes_infos = [elt for layer in range(len(self.stream_list)) for elt in self._get_flatten_stream(layer)]
+        s_len = self.nb_layers
+        all_nodes_infos = [elt for layer in range(self.nb_layers) for elt in self._get_flatten_stream(layer)]
         all_nodes_infos.sort(key=lambda x: x["timestamp"])
         nb_notes = len(all_nodes_infos)
         for i in range(nb_notes):
@@ -447,10 +454,6 @@ class MultiLayerNetwork:
             folder = self.outfolder
         if filename is None:
             filename = self.name
-        try:
-            os.mkdir(folder)
-        except:
-            pass
         return folder + filename, folder, filename
 
     def _export_net(self, net, folder=None, filename=None):
@@ -473,7 +476,7 @@ class MultiLayerNetwork:
             filename (string): Output filename
         """
         filepath,folder,filename = self._get_file_path(folder, filename)
-        self._print_if_useful("[+] Writing " + str(len(self.stream_list)) + " graphml subnet files to : " + folder, 1)
+        self._print_if_useful("[+] Writing " + str(self.nb_layers) + " graphml subnet files to : " + folder, 1)
         for i in range(0,len(sub_nets)):
             cur_out = filepath + "l_" + str(i) + ".graphml"
             nx.write_graphml(sub_nets[i], cur_out)
@@ -485,7 +488,7 @@ class MultiLayerNetwork:
         cur_out = filepath + "_intergraph.graphml"
         nx.write_graphml(intergraph, cur_out)
 
-    def create_net(self, separate_graphs=False):
+    def create_net(self, separate_graphs=False, output_txt=True):
         """Create the main network
             Args:
                 - separate_graphs(bool): If set to True, create a net for every midi file, else create only one net where everything is aggregated
@@ -500,8 +503,11 @@ class MultiLayerNetwork:
         for midi_file_path in self.midi_files:
             self.load_new_midi(midi_file_path)
             self._stream_to_network()
+            name = os.path.splitext(os.path.basename(midi_file_path))[0]
+            if output_txt:
+                for i in range(self.nb_layers):
+                    self.export_nodes_list(filename=name, layer=i)
             if separate_graphs:
-                name = os.path.splitext(os.path.basename(midi_file_path))[0]
                 self.separated_nets[name] = self.net
                 self.separated_sub_nets[name] = self._get_sub_nets(self.net)
                 self.separated_intergraphs[name] = self._get_intergraph(self.net)
@@ -545,7 +551,7 @@ class MultiLayerNetwork:
         """
         if not self.layer:
             return [net]
-        s_len = len(self.stream_list)
+        s_len = self.nb_layers
         sub_nets =[]
         for i in range(s_len):
             def filter(node, layer=i): return net.nodes[node]["layer"]==layer # use default arg to avoid dependancy on i
@@ -566,7 +572,7 @@ class MultiLayerNetwork:
     def _get_nodes_list(self, layer=0):
         return [self.build_node(elt) for elt in self._get_flatten_stream(layer)]
     
-    def export_nodes_list(self, file_path=None, layer=0):
+    def export_nodes_list(self, folder=None, filename=None, layer=0):
         """Export the list of nodes in the order they are played in the song
 
         Args:
@@ -574,8 +580,11 @@ class MultiLayerNetwork:
             layer (int): index of the layer to export
 
         """
-        if file_path is None:
-            file_path = self.default_filepath(".txt")
+        file_path, _, _ = self._get_file_path(folder, filename)
+        if self.nb_layers > 1:
+            file_path += f"_nodesl_{layer}.txt"
+        else:
+            file_path +="_nodes.txt"
         lst = self._get_nodes_list(layer)
         open(file_path,"w").write("\n".join(lst))
 
@@ -620,11 +629,6 @@ class MultiLayerNetwork:
         """
         if types == "all":
             types = ["main_net","sub_net","intergraph"]
-        
-        try:
-            os.makedirs(self.outfolder)
-        except:
-            pass
 
         if self.aggregated_net.number_of_nodes() > 0:
             self._prepare_for_export(self.aggregated_net)
@@ -656,7 +660,7 @@ if __name__ == "__main__" :
     net1 = MultiLayerNetwork(use_gui=True, outfolder=output_folder, midi_files=midi_files)
 
     # Build net
-    net1.create_net(separate_graphs=True)
+    net1.create_net(separate_graphs=True, output_txt=True)
     
     # Export nets ('all' = main nets + subnets + intergraphs)
     net1.export_nets()
