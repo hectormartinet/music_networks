@@ -629,6 +629,9 @@ class MultiLayerNetwork:
         """
         if types == "all":
             types = ["main_net","sub_net","intergraph"]
+        
+        if not self.layer:
+            types = ["main_net"]
 
         if self.aggregated_net.number_of_nodes() > 0:
             self._prepare_for_export(self.aggregated_net)
