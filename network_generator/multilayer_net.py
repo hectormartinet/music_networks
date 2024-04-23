@@ -626,11 +626,14 @@ class MultiLayerNetwork:
 
         Args:
             list[str]: types of nets ('main_net','sub_net','intergraph') or the shortcut 'all' to pick them all
+                - main_net: The net in its entirety
+                - sub_net: Layers of the main net. As many sub_nets as the number of layers. Is not exported if there is only one layer (would be the same as the main net)
+                - intergraph: Graph of the interlayer edges between the layers. Only one intergraph per net. Is not exported if there is only one layer (would be empty)
         """
         if types == "all":
             types = ["main_net","sub_net","intergraph"]
         
-        if not self.layer:
+        if self.nb_layers <= 1:
             types = ["main_net"]
 
         if self.aggregated_net.number_of_nodes() > 0:
