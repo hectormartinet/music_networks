@@ -620,6 +620,11 @@ class MultiLayerNetwork:
         """
         if types == "all":
             types = ["main_net","sub_net","intergraph"]
+        
+        try:
+            os.makedirs(self.outfolder)
+        except:
+            pass
 
         if self.aggregated_net.number_of_nodes() > 0:
             self._prepare_for_export(self.aggregated_net)
