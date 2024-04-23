@@ -80,7 +80,7 @@ class MultiLayerNetwork:
             "group_by_beat":False,
             "split_chords":False,
             "duration_weighted_intergraph":True,
-            "analyze_key":True,
+            "analyze_key":False,
             "midi_files":["midis/invent_bach/invent1.mid"],
             "outfolder":"results"
         }
