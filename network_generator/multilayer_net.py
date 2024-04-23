@@ -2,6 +2,7 @@ import music21 as ms
 import networkx as nx
 import parameter_picker as par_pick
 from preset_params import get_preset_params
+import multi_timer
 import os
 from tqdm import tqdm
 import math
@@ -80,7 +81,7 @@ class MultiLayerNetwork:
             "group_by_beat":False,
             "split_chords":False,
             "duration_weighted_intergraph":True,
-            "analyze_key":True,
+            "analyze_key":False,
             "midi_files":["midis/invent_bach/invent1.mid"],
             "outfolder":"results"
         }
@@ -116,6 +117,9 @@ class MultiLayerNetwork:
             os.makedirs(self.outfolder)
         except:
             pass
+        
+        self.timer = multi_timer.MultiTimer()
+
 
     def _auto_name(self, preset_param=None):
         name = ""
@@ -149,6 +153,7 @@ class MultiLayerNetwork:
         return par_pick.get_parameters(params)
 
     def load_new_midi(self, midifilename):
+        self.timer.start("load_new_midi")
         self.stream_list = []
         self.parsed_stream_list = []
         self.instruments = []
@@ -179,6 +184,8 @@ class MultiLayerNetwork:
         if self.group_by_beat:
             self.group_notes_by_beat()
         self.parsed_stream_list = [self._build_parsed_list(part, i) for i,part in enumerate(self.stream_list)]
+        self.timer.end("load_new_midi")
+
 
     def _parse_params(self, **params):
         self.rest = params["rest"]
@@ -334,6 +341,7 @@ class MultiLayerNetwork:
             return pitch.name 
     
     def _stream_to_network(self):
+        self.timer.start("stream_to_network")
         s_len = self.nb_layers
         self._print_if_useful("[+] Creating network - Intra-layer processing", 2)
 
@@ -342,6 +350,7 @@ class MultiLayerNetwork:
         if self.layer and s_len > 1:
             self._print_if_useful("[+] Creating network - Inter-layer processing", 2)
             self._process_inter_layer()
+        self.timer.end("stream_to_network")
         return self.net
 
     def _process_intra_layer(self, layer, prev_elt=None):
@@ -658,15 +667,17 @@ class MultiLayerNetwork:
 
 if __name__ == "__main__" :
 
-    directory = "midis\\invent_bach\\"
+    directory = "datasets\\PianoWorks\\"
     midi_files = [directory + f for f in os.listdir(directory)]
     output_folder = 'results'  # Replace with your desired output folder
     
     # Create the MultiLayerNetwork object with the MIDI file and output folder
-    net1 = MultiLayerNetwork(use_gui=True, outfolder=output_folder, midi_files=midi_files)
+    net1 = MultiLayerNetwork(use_gui=False, outfolder=output_folder, midi_files=midi_files, preset_param="liu", verbosity=0)
 
     # Build net
     net1.create_net(separate_graphs=True, output_txt=True)
     
     # Export nets ('all' = main nets + subnets + intergraphs)
     net1.export_nets()
+
+    net1.timer.print_times()
