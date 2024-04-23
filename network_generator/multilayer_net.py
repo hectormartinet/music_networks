@@ -667,7 +667,8 @@ class MultiLayerNetwork:
 
 if __name__ == "__main__" :
 
-    directory = "datasets\\PianoWorks\\"
+    # directory = "datasets\\PianoWorks\\"
+    directory = "midi\\"
     midi_files = [directory + f for f in os.listdir(directory)]
     output_folder = 'results'  # Replace with your desired output folder
     
