@@ -161,7 +161,9 @@ class MultiLayerNetwork:
         self.key = None
         self.midi_file = midifilename
         self._print_if_useful("Loading new midi : " + midifilename, 2)
+        self.timer.start("ms_midi_loading")
         whole_piece = ms.converter.parse(midifilename, quarterLengthDivisors = (16,))
+        self.timer.end("ms_midi_loading")
         if self.analyze_key:
             self.original_key = whole_piece.flatten().analyze('key')
             self._print_if_useful("analyzed key : " + str(self.original_key), 3)
@@ -183,7 +185,9 @@ class MultiLayerNetwork:
                     self.instruments.append(str(elt))
         if self.group_by_beat:
             self.group_notes_by_beat()
+        self.timer.start("parsing_notes")
         self.parsed_stream_list = [self._build_parsed_list(part, i) for i,part in enumerate(self.stream_list)]
+        self.timer.end("parsing_notes")
         self.timer.end("load_new_midi")
 
 
@@ -667,8 +671,8 @@ class MultiLayerNetwork:
 
 if __name__ == "__main__" :
 
-    # directory = "datasets\\PianoWorks\\"
-    directory = "midi\\"
+    directory = "datasets\\PianoWorks\\"
+    # directory = "midis\\invent_bach\\"
     midi_files = [directory + f for f in os.listdir(directory)]
     output_folder = 'results'  # Replace with your desired output folder
     
