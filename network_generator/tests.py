@@ -780,7 +780,7 @@ class MultilayerNetworkTester:
             raise Exception("analyze_key=False, but the analysis has been done")
         
         # Without analysis
-        self.current_test = "analyze_key(False)"
+        self.current_test = "analyze_key(True)"
 
         # Create net
         net = MultiLayerNetwork(use_gui=False, verbosity=0, midi_files=file_path, analyze_key=True)
