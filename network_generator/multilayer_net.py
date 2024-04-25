@@ -392,7 +392,6 @@ class MultiLayerNetwork:
             prev_elts = elts
     
     def _process_inter_layer(self):
-        s_len = self.nb_layers
         all_nodes_infos = [elt for layer in range(self.nb_layers) for elt in self._get_flatten_stream(layer)]
         all_nodes_infos.sort(key=lambda x: x["timestamp"])
         nb_notes = len(all_nodes_infos)
@@ -418,39 +417,43 @@ class MultiLayerNetwork:
 
     def _add_or_update_node(self, node, infos):
         if not self.net.has_node(node):
-            def conditional_list(elt, elt_param):
-                return elt if elt_param else [elt]
-            self.net.add_node(node, 
-                weight=1, 
-                layer = conditional_list(infos["layer"], self.multilayer), 
-                pitch = conditional_list(infos["pitch"], self.pitch and self.octave),
-                pitch_class = conditional_list(infos["pitch_class"], self.pitch),
-                chromatic_interval = conditional_list(infos["chromatic_interval"], self.chromatic_interval),
-                diatonic_interval = conditional_list(infos["diatonic_interval"], self.diatonic_interval),
-                duration = conditional_list(float(infos["duration"]), self.duration),
-                offset = conditional_list(float(infos["offset"]), self.offset),
-                timestamps =[float(infos["timestamp"])],
-                rest = conditional_list(infos["rest"], self.rest),
-                chord_function = conditional_list(infos["chord_function"], self.chord_function)
-            )
+            self.net.add_node(node, weight=1)
+            def add_attribute(param, param_used, elt=None):
+                if elt is None:
+                    elt = infos[param]
+                if param_used:
+                    self.net.nodes[node][param] = elt
+                elif self.keep_extra:
+                    self.net.nodes[node][param] = [elt]
+            add_attribute("layer", self.multilayer)
+            add_attribute("pitch", self.pitch and self.octave)
+            add_attribute("pitch_class", self.pitch)
+            add_attribute("chromatic_interval", self.chromatic_interval)
+            add_attribute("diatonic_interval", self.diatonic_interval)
+            add_attribute("duration", self.duration, float(infos["duration"]))
+            add_attribute("offset", self.offset, float(infos["offset"]))
+            add_attribute("timestamps", False,elt=float(infos["timestamp"]))
+            add_attribute("rest", self.rest)
+            add_attribute("chord_function", self.chord_function)
         else :
             self.net.nodes[node]["weight"] += 1
-            def append_if_list(attribute, elt_to_add=None):
-                if type(self.net.nodes[node][attribute]) == list:
-                    if elt_to_add is None:
-                        self.net.nodes[node][attribute].append(infos[attribute])
-                    else:
-                        self.net.nodes[node][attribute].append(elt_to_add)
-            append_if_list("layer")
-            append_if_list("pitch")
-            append_if_list("pitch_class")
-            append_if_list("chromatic_interval")
-            append_if_list("diatonic_interval")
-            append_if_list("duration",float(infos["duration"]))
-            append_if_list("offset", float(infos["offset"]))
-            append_if_list("rest")
-            append_if_list("chord_function")
-            self.net.nodes[node]["timestamps"].append(float(infos["timestamp"]))
+            if self.keep_extra:
+                def append_if_list(attribute, elt_to_add=None):
+                    if type(self.net.nodes[node][attribute]) == list:
+                        if elt_to_add is None:
+                            self.net.nodes[node][attribute].append(infos[attribute])
+                        else:
+                            self.net.nodes[node][attribute].append(elt_to_add)
+                append_if_list("layer")
+                append_if_list("pitch")
+                append_if_list("pitch_class")
+                append_if_list("chromatic_interval")
+                append_if_list("diatonic_interval")
+                append_if_list("duration",float(infos["duration"]))
+                append_if_list("offset", float(infos["offset"]))
+                append_if_list("rest")
+                append_if_list("chord_function")
+                self.net.nodes[node]["timestamps"].append(float(infos["timestamp"]))
     
     def _add_or_update_edge(self, from_node, to_node, inter, weight=1):
         if from_node is None or to_node is None: return
@@ -463,6 +466,7 @@ class MultiLayerNetwork:
         """
         Necessary step before exporting graph.
         """
+        if not self.keep_extra:return
         for node in net.nodes:
             for attribute in net.nodes[node].keys():
                 if type(net.nodes[node][attribute]) == list :
@@ -568,11 +572,10 @@ class MultiLayerNetwork:
         Returns:
             list[NetworkX]: The list of subnetworks
         """
-        if not self.multilayer:
+        if not self.multilayer or self.nb_layers <= 1:
             return [net]
-        s_len = self.nb_layers
         sub_nets =[]
-        for i in range(s_len):
+        for i in range(self.nb_layers):
             def filter(node, layer=i): return net.nodes[node]["layer"]==layer # use default arg to avoid dependancy on i
             sub_nets.append(nx.subgraph_view(net, filter_node=filter))
         return sub_nets
@@ -651,9 +654,6 @@ class MultiLayerNetwork:
         """
         if types == "all":
             types = ["main_net","sub_net","intergraph"]
-        
-        if self.nb_layers <= 1:
-            types = ["main_net"]
 
         if self.aggregated_net.number_of_nodes() > 0:
             self._prepare_for_export(self.aggregated_net)
