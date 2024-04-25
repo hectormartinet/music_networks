@@ -301,8 +301,8 @@ class MultiLayerNetwork:
     
     def _parse_interval(self, prev_elt, next_elt=None):
         if next_elt is None or prev_elt["rest"] or next_elt["rest"]:
-            prev_elt["chromatic_interval"] = 0
-            prev_elt["diatonic_interval"] = 0
+            prev_elt["chromatic_interval"] = "N/A"
+            prev_elt["diatonic_interval"] = "N/A"
             return
         def get_high_note_pitch(elt):
             return ms.pitch.Pitch(elt["pitch"].split(" ")[-1])

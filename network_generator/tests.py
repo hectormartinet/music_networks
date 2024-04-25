@@ -79,7 +79,7 @@ class MultilayerNetworkTester:
         """
 
         net = MultiLayerNetwork(use_gui=False,verbosity=0,**params)
-        net.create_net()
+        net.create_net(output_txt=False)
         net.get_net()
         net._get_sub_nets()
         net._get_nodes_list()
@@ -114,7 +114,7 @@ class MultilayerNetworkTester:
         
         # Create net
         net = MultiLayerNetwork(use_gui=False, verbosity=0, midi_files=file_path, enharmony=True)
-        net.create_net()
+        net.create_net(output_txt=False)
         graph = net.get_net()
 
         # Create expected graph
@@ -130,7 +130,7 @@ class MultilayerNetworkTester:
 
         # Create net
         net = MultiLayerNetwork(use_gui=False, verbosity=0, midi_files=file_path, enharmony=False)
-        net.create_net()
+        net.create_net(output_txt=False)
         graph = net.get_net()
 
         # Create expected graph
@@ -164,7 +164,7 @@ class MultilayerNetworkTester:
 
         # Create net
         net = MultiLayerNetwork(use_gui=False, verbosity=0, midi_files=file_path, pitch=False, chord_function=True)
-        net.create_net()
+        net.create_net(output_txt=False)
         graph = net.get_net()
 
         # Create expected graph
@@ -192,7 +192,7 @@ class MultilayerNetworkTester:
 
         # Create net
         net = MultiLayerNetwork(use_gui=False, verbosity=0, midi_files=file_path, group_by_beat=True)
-        net.create_net()
+        net.create_net(output_txt=False)
         graph = net.get_net()
 
         # Create expected graph
@@ -221,7 +221,7 @@ class MultilayerNetworkTester:
 
         # Create net
         net = MultiLayerNetwork(use_gui=False, verbosity=0, midi_files=file_path)
-        net.create_net()
+        net.create_net(output_txt=False)
         graph = net.get_net()
 
         # Create expected graph
@@ -251,7 +251,7 @@ class MultilayerNetworkTester:
 
         # Create net
         net = MultiLayerNetwork(use_gui=False, verbosity=0, midi_files=file_path, octave=True)
-        net.create_net()
+        net.create_net(output_txt=False)
         graph = net.get_net()
 
         # Create expected graph
@@ -281,7 +281,7 @@ class MultilayerNetworkTester:
 
         # Create net
         net = MultiLayerNetwork(use_gui=False, verbosity=0, midi_files=file_path, duration=True, pitch=False)
-        net.create_net()
+        net.create_net(output_txt=False)
         graph = net.get_net()
 
         # Create expected graph
@@ -313,7 +313,7 @@ class MultilayerNetworkTester:
 
         # Create net
         net = MultiLayerNetwork(use_gui=False, verbosity=0, midi_files=file_path, rest=True)
-        net.create_net()
+        net.create_net(output_txt=False)
         graph = net.get_net()
         
         # Create expected graph
@@ -333,7 +333,7 @@ class MultilayerNetworkTester:
 
         # Create net
         net = MultiLayerNetwork(use_gui=False, verbosity=0, midi_files=file_path, rest=False)
-        net.create_net()
+        net.create_net(output_txt=False)
         graph = net.get_net()
         
         # Create expected graph
@@ -358,7 +358,7 @@ class MultilayerNetworkTester:
 
         # Create net
         net = MultiLayerNetwork(use_gui=False, verbosity=0, midi_files=file_path, offset=True, offset_period=1)
-        net.create_net()
+        net.create_net(output_txt=False)
         graph = net.get_net()
 
         # Create expected graph
@@ -403,7 +403,7 @@ class MultilayerNetworkTester:
 
         # Create net
         net = MultiLayerNetwork(use_gui=False, verbosity=0, midi_files=file_path, transpose=True)
-        net.create_net()
+        net.create_net(output_txt=False)
         if net.original_key != ms.key.Key("G",mode="major"):
             raise Exception(f"Key analysis failed, expected tonality : G major, found : {net.original_key}")
         graph = net.get_net()
@@ -441,7 +441,7 @@ class MultilayerNetworkTester:
 
         # Create net
         net = MultiLayerNetwork(use_gui=False, verbosity=0, midi_files=file_path, structure="multilayer", duration_weighted_intergraph=False, strict_link=True)
-        net.create_net()
+        net.create_net(output_txt=False)
         graph = net._get_intergraph(net.net)
 
         # Create expected graph
@@ -487,7 +487,7 @@ class MultilayerNetworkTester:
 
         # Create net
         net = MultiLayerNetwork(use_gui=False, verbosity=0, midi_files=file_path, max_link_time_diff=2)
-        net.create_net()
+        net.create_net(output_txt=False)
         graph = net.get_net()
 
         # Create expected graph
@@ -518,7 +518,7 @@ class MultilayerNetworkTester:
 
         # Create net
         net = MultiLayerNetwork(use_gui=False, verbosity=0, midi_files=file_path, structure="multilayer", duration_weighted_intergraph = False)
-        net.create_net()
+        net.create_net(output_txt=False)
         graph = net._get_intergraph(net.net)
 
         # Create expected graph
@@ -569,7 +569,7 @@ class MultilayerNetworkTester:
 
         # Create net
         net = MultiLayerNetwork(use_gui=False, verbosity=0, midi_files=file_path, structure="monolayer")
-        net.create_net()
+        net.create_net(output_txt=False)
         graph = net.get_net()
 
         # Create expected graph
@@ -602,7 +602,7 @@ class MultilayerNetworkTester:
 
         # Create net
         net = MultiLayerNetwork(use_gui=False, verbosity=0, midi_files=file_path, structure="chordify", duration=True)
-        net.create_net()
+        net.create_net(output_txt=False)
         graph = net.get_net()
 
         # Create expected graph
@@ -641,7 +641,7 @@ class MultilayerNetworkTester:
 
         # Create net
         net = MultiLayerNetwork(use_gui=False, verbosity=0, midi_files=file_path, diatonic_interval=True, enharmony=False)
-        net.create_net()
+        net.create_net(output_txt=False)
         graph = net.get_net()
 
         # Create expected graph
@@ -653,14 +653,14 @@ class MultilayerNetworkTester:
         parsed_elt2 = net.parse_elt(note2)
         parsed_elt2["diatonic_interval"] = -2
         parsed_elt3 = net.parse_elt(note3)
-        parsed_elt3["diatonic_interval"] = 0
+        parsed_elt3["diatonic_interval"] = "N/A"
         node1 = net.build_node(parsed_elt1)
         node2 = net.build_node(parsed_elt2)
         node3 = net.build_node(parsed_elt3)
         exp_graph = nx.DiGraph()
         exp_graph.add_node(node1, weight=1, pitch_class="C", diatonic_interval = 3)
         exp_graph.add_node(node2, weight=1, pitch_class="E##", diatonic_interval = -2)
-        exp_graph.add_node(node3, weight=1, pitch_class="D-", diatonic_interval = 0)
+        exp_graph.add_node(node3, weight=1, pitch_class="D-", diatonic_interval = "N/A")
         exp_graph.add_edge(node1, node2, weight=1)
         exp_graph.add_edge(node2, node3, weight=1)
         self.assert_graph_match(graph, exp_graph)
@@ -675,7 +675,7 @@ class MultilayerNetworkTester:
 
         # Create net
         net = MultiLayerNetwork(use_gui=False, verbosity=0, midi_files=file_path, chromatic_interval=True)
-        net.create_net()
+        net.create_net(output_txt=False)
         graph = net.get_net()
 
         # Create expected graph
@@ -687,14 +687,14 @@ class MultilayerNetworkTester:
         parsed_elt2 = net.parse_elt(note2)
         parsed_elt2["chromatic_interval"] = -1
         parsed_elt3 = net.parse_elt(note3)
-        parsed_elt3["chromatic_interval"] = 0
+        parsed_elt3["chromatic_interval"] = "N/A"
         node1 = net.build_node(parsed_elt1)
         node2 = net.build_node(parsed_elt2)
         node3 = net.build_node(parsed_elt3)
         exp_graph = nx.DiGraph()
         exp_graph.add_node(node1, weight=1, pitch_class="C", chromatic_interval = 4)
         exp_graph.add_node(node2, weight=1, pitch_class="E", chromatic_interval = -1)
-        exp_graph.add_node(node3, weight=1, pitch_class="E-", chromatic_interval = 0)
+        exp_graph.add_node(node3, weight=1, pitch_class="E-", chromatic_interval = "N/A")
         exp_graph.add_edge(node1, node2, weight=1)
         exp_graph.add_edge(node2, node3, weight=1)
         self.assert_graph_match(graph, exp_graph)
@@ -718,7 +718,7 @@ class MultilayerNetworkTester:
 
         # Create net
         net = MultiLayerNetwork(use_gui=False, verbosity=0, midi_files=file_path, split_chords=True)
-        net.create_net()
+        net.create_net(output_txt=False)
         graph = net.get_net()
 
         # Create expected graph
@@ -759,7 +759,7 @@ class MultilayerNetworkTester:
 
         # Create net
         net = MultiLayerNetwork(use_gui=False, verbosity=0, midi_files=file_path, structure="multilayer", duration_weighted_intergraph=True)
-        net.create_net()
+        net.create_net(output_txt=False)
         graph = net._get_intergraph(net.net)
 
         # Create expected graph
@@ -809,7 +809,7 @@ class MultilayerNetworkTester:
         
         # Create net
         net = MultiLayerNetwork(use_gui=False, verbosity=0, midi_files=file_path, analyze_key=False)
-        net.create_net()
+        net.create_net(output_txt=False)
         if net.original_key is not None:
             raise Exception("analyze_key=False, but the analysis has been done")
         
@@ -818,7 +818,7 @@ class MultilayerNetworkTester:
 
         # Create net
         net = MultiLayerNetwork(use_gui=False, verbosity=0, midi_files=file_path, analyze_key=True)
-        net.create_net()
+        net.create_net(output_txt=False)
         if net.original_key is None:
             raise Exception("analyze_key=True, but the analysis has not been done")
 
