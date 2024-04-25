@@ -677,13 +677,12 @@ class MultiLayerNetwork:
 
 if __name__ == "__main__" :
 
-    directory = "datasets\\PianoWorks\\"
-    # directory = "midis\\invent_bach\\"
+    directory = "midis\\invent_bach\\"
     midi_files = [directory + f for f in os.listdir(directory)]
     output_folder = 'results'  # Replace with your desired output folder
     
     # Create the MultiLayerNetwork object with the MIDI file and output folder
-    net1 = MultiLayerNetwork(use_gui=True, outfolder=output_folder, midi_files=midi_files, preset_param="liu", verbosity=0)
+    net1 = MultiLayerNetwork(use_gui=True, outfolder=output_folder, midi_files=midi_files, preset_param="liu")
 
     # Build net
     net1.create_net(separate_graphs=True, output_txt=True)
@@ -691,4 +690,5 @@ if __name__ == "__main__" :
     # Export nets ('all' = main nets + subnets + intergraphs)
     net1.export_nets()
 
-    net1.timer.print_times()
+    # Output processing times
+    # net1.timer.print_times()
