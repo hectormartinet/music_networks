@@ -51,6 +51,7 @@ class MultilayerNetworkTester:
             self.test_split_chords,
             self.test_chordify,
             self.test_multilayer,
+            self.test_monolayer,
             self.test_strict_link,
             self.test_analyze_key,
             self.test_chromatic_interval,
@@ -439,7 +440,7 @@ class MultilayerNetworkTester:
         stream.write("midi", file_path)
 
         # Create net
-        net = MultiLayerNetwork(use_gui=False, verbosity=0, midi_files=file_path, layer=True, duration_weighted_intergraph=False, strict_link=True)
+        net = MultiLayerNetwork(use_gui=False, verbosity=0, midi_files=file_path, structure="multilayer", duration_weighted_intergraph=False, strict_link=True)
         net.create_net()
         graph = net._get_intergraph(net.net)
 
@@ -549,6 +550,39 @@ class MultilayerNetworkTester:
         exp_graph.add_edge(node0_2, node1_3, weight=1)
         exp_graph.add_edge(node1_3, node0_2, weight=1)
 
+        self.assert_graph_match(graph, exp_graph)
+
+    def test_monolayer(self):
+        self.current_test = "monolayer"
+        
+        # Create midi file, tinyNotation does not work when using multiple parts
+        part1 = ms.stream.Part()
+        part1.append(ms.note.Note("E"))
+        part1.append(ms.note.Note("C"))
+        part2 = ms.stream.Part()
+        part2.append(ms.note.Note("C"))
+        part2.append(ms.note.Note("D"))
+        part2.append(ms.note.Note("E"))
+        stream = ms.stream.Stream([part1, part2])
+        file_path = self.test_folder + self.current_test + ".mid"
+        stream.write("midi", file_path)
+
+        # Create net
+        net = MultiLayerNetwork(use_gui=False, verbosity=0, midi_files=file_path, structure="monolayer")
+        net.create_net()
+        graph = net.get_net()
+
+        # Create expected graph
+        node1 = net.build_node(net.parse_elt(ms.note.Note("C")))
+        node2 = net.build_node(net.parse_elt(ms.note.Note("D")))
+        node3 = net.build_node(net.parse_elt(ms.note.Note("E")))
+        exp_graph = nx.DiGraph()
+        exp_graph.add_node(node1, weight=2, pitch_class="C")
+        exp_graph.add_node(node2, weight=1, pitch_class="D")
+        exp_graph.add_node(node3, weight=2, pitch_class="E")
+        exp_graph.add_edge(node1, node2, weight=1)
+        exp_graph.add_edge(node2, node3, weight=1)
+        exp_graph.add_edge(node3, node1, weight=1)
         self.assert_graph_match(graph, exp_graph)
     
     def test_chordify(self):
@@ -724,7 +758,7 @@ class MultilayerNetworkTester:
         stream.write("midi", file_path)
 
         # Create net
-        net = MultiLayerNetwork(use_gui=False, verbosity=0, midi_files=file_path, layer=True, duration_weighted_intergraph=True)
+        net = MultiLayerNetwork(use_gui=False, verbosity=0, midi_files=file_path, structure="multilayer", duration_weighted_intergraph=True)
         net.create_net()
         graph = net._get_intergraph(net.net)
 

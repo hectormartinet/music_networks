@@ -50,8 +50,8 @@ class MultiLayerNetwork:
                     (i.e. just separated by rests) for them to be linked. Defaults to 4.
 
             General structure parameters: Describe the general behaviour of the network
-                - structure(str): Gives the struture of the outputed net. If the song has only one part, this parameter does not matter and \
-                    and will default to 'monolayer'. Here is each value possible for this parameter:
+                - structure(str): Gives the struture of the outputed net. If the song has only one part, this parameter does not matter \
+                    Here is each value possible for this parameter:
                     - 'multilayer': Process each part separately and output a net with as much layers as they are parts in the input file.
                     - 'monolayer': Process each part separately but aggregate the values in a net with one layer
                     - 'chordify': Flatten all the parts into one part
@@ -353,12 +353,11 @@ class MultiLayerNetwork:
     
     def _stream_to_network(self):
         self.timer.start("stream_to_network")
-        s_len = self.nb_layers
         self._print_if_useful("[+] Creating network - Intra-layer processing", 2)
 
-        for i in range(s_len):  # For each instrument
-            self._process_intra_layer(i if self.multilayer else 0)
-        if self.multilayer and s_len > 1:
+        for i in range(self.nb_layers):  # For each instrument
+            self._process_intra_layer(i)
+        if self.multilayer and self.nb_layers > 1:
             self._print_if_useful("[+] Creating network - Inter-layer processing", 2)
             self._process_inter_layer()
         self.timer.end("stream_to_network")
