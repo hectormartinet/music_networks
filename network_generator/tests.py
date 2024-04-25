@@ -49,8 +49,8 @@ class MultilayerNetworkTester:
             self.test_transpose,
             self.test_max_link_time_diff,
             self.test_split_chords,
-            self.test_flatten,
-            self.test_layer,
+            self.test_chordify,
+            self.test_multilayer,
             self.test_strict_link,
             self.test_analyze_key,
             self.test_chromatic_interval,
@@ -500,8 +500,8 @@ class MultilayerNetworkTester:
         exp_graph.add_edge(node1, node2, weight=1)
         self.assert_graph_match(graph, exp_graph)
 
-    def test_layer(self):
-        self.current_test = "layer"
+    def test_multilayer(self):
+        self.current_test = "multilayer"
         
         # Create midi file, tinyNotation does not work when using multiple parts
         part1 = ms.stream.Part()
@@ -516,7 +516,7 @@ class MultilayerNetworkTester:
         stream.write("midi", file_path)
 
         # Create net
-        net = MultiLayerNetwork(use_gui=False, verbosity=0, midi_files=file_path, layer=True, duration_weighted_intergraph = False)
+        net = MultiLayerNetwork(use_gui=False, verbosity=0, midi_files=file_path, structure="multilayer", duration_weighted_intergraph = False)
         net.create_net()
         graph = net._get_intergraph(net.net)
 
@@ -551,8 +551,8 @@ class MultilayerNetworkTester:
 
         self.assert_graph_match(graph, exp_graph)
     
-    def test_flatten(self):
-        self.current_test = "flatten"
+    def test_chordify(self):
+        self.current_test = "chordify"
 
         # Create midi file, tinyNotation does not work when using multiple parts
         part1 = ms.stream.Part()
@@ -567,7 +567,7 @@ class MultilayerNetworkTester:
         stream.write("midi", file_path)
 
         # Create net
-        net = MultiLayerNetwork(use_gui=False, verbosity=0, midi_files=file_path, layer=False, flatten=True, duration=True)
+        net = MultiLayerNetwork(use_gui=False, verbosity=0, midi_files=file_path, structure="chordify", duration=True)
         net.create_net()
         graph = net.get_net()
 

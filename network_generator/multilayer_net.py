@@ -50,9 +50,12 @@ class MultiLayerNetwork:
                     (i.e. just separated by rests) for them to be linked. Defaults to 4.
 
             General structure parameters: Describe the general behaviour of the network
-                - layer(bool): Create a network with a layer for every part. Defaults to True.
+                - structure(str): Gives the struture of the outputed net. If the song has only one part, this parameter does not matter and \
+                    and will default to 'monolayer'. Here is each value possible for this parameter:
+                    - 'multilayer': Process each part separately and output a net with as much layers as they are parts in the input file.
+                    - 'monolayer': Process each part separately but aggregate the values in a net with one layer
+                    - 'chordify': Flatten all the parts into one part
                 - transpose(bool): Transpose the song in C major/ A minor depending on the mode based on the starting tonality. Defaults to False.
-                - flatten(bool): Flatten the song and treat everything as one part.
                 - enharmony(bool): Treat equivalent notes (e.g. C# and Db) as the same note. Defaults to True.
                 - group_by_beat(bool): Group the notes of each part by beat and set durations to 1. Defaults to False.
 
@@ -74,8 +77,7 @@ class MultiLayerNetwork:
             "chromatic_interval":False,
             "chord_function":False,
             "transpose":False,
-            "flatten":False,
-            "layer":True,
+            "structure":"multilayer",
             "strict_link":False,
             "max_link_time_diff":4.,
             "group_by_beat":False,
@@ -168,7 +170,7 @@ class MultiLayerNetwork:
             self.original_key = whole_piece.flatten().analyze('key')
             self._print_if_useful("analyzed key : " + str(self.original_key), 3)
             self.key = self.original_key
-        if self.flatten:
+        if self.chordify:
             whole_piece = whole_piece.chordify()
             if self.transpose:
                 self.stream_list.append(self._stream_to_C(whole_piece))
@@ -203,8 +205,7 @@ class MultiLayerNetwork:
         self.transpose = params["transpose"]
         self.strict_link = params["strict_link"]
         self.max_link_time_diff = params["max_link_time_diff"]
-        self.flatten = params["flatten"]
-        self.layer = params["layer"] and not self.flatten
+        self.structure = params["structure"]
         self.diatonic_interval = params["diatonic_interval"] and not self.enharmony
         self.chromatic_interval = params["chromatic_interval"]
         self.chord_function = params["chord_function"]
@@ -227,6 +228,12 @@ class MultiLayerNetwork:
 
     @property
     def nb_layers(self): return len(self.stream_list)
+
+    @property
+    def chordify(self): return self.structure == "chordify"
+
+    @property
+    def multilayer(self): return self.structure == "multilayer"
 
     def _stream_to_C(self, part):
         if self.original_key.mode == "major":
@@ -319,7 +326,7 @@ class MultiLayerNetwork:
             node["diatonic_interval"] = infos["diatonic_interval"]
         if self.chromatic_interval:
             node["chromatic_interval"] = infos["chromatic_interval"]
-        if self.layer:
+        if self.multilayer:
             node["layer"] = infos["layer"]
         if self.chord_function:
             node["chord_function"] = infos["chord_function"]
@@ -350,8 +357,8 @@ class MultiLayerNetwork:
         self._print_if_useful("[+] Creating network - Intra-layer processing", 2)
 
         for i in range(s_len):  # For each instrument
-            self._process_intra_layer(i if self.layer else 0)
-        if self.layer and s_len > 1:
+            self._process_intra_layer(i if self.multilayer else 0)
+        if self.multilayer and s_len > 1:
             self._print_if_useful("[+] Creating network - Inter-layer processing", 2)
             self._process_inter_layer()
         self.timer.end("stream_to_network")
@@ -416,7 +423,7 @@ class MultiLayerNetwork:
                 return elt if elt_param else [elt]
             self.net.add_node(node, 
                 weight=1, 
-                layer = conditional_list(infos["layer"], self.layer), 
+                layer = conditional_list(infos["layer"], self.multilayer), 
                 pitch = conditional_list(infos["pitch"], self.pitch and self.octave),
                 pitch_class = conditional_list(infos["pitch_class"], self.pitch),
                 chromatic_interval = conditional_list(infos["chromatic_interval"], self.chromatic_interval),
@@ -562,7 +569,7 @@ class MultiLayerNetwork:
         Returns:
             list[NetworkX]: The list of subnetworks
         """
-        if not self.layer:
+        if not self.multilayer:
             return [net]
         s_len = self.nb_layers
         sub_nets =[]
@@ -577,7 +584,7 @@ class MultiLayerNetwork:
         Returns:
             list[NetworkX]: The list of subnetworks
         """
-        if not self.layer:
+        if not self.multilayer:
             return nx.DiGraph()
         def filter(node1,node2): return net[node1][node2]["inter"]
         return nx.subgraph_view(net, filter_edge=filter)
@@ -677,7 +684,7 @@ if __name__ == "__main__" :
     output_folder = 'results'  # Replace with your desired output folder
     
     # Create the MultiLayerNetwork object with the MIDI file and output folder
-    net1 = MultiLayerNetwork(use_gui=False, outfolder=output_folder, midi_files=midi_files, preset_param="liu", verbosity=0)
+    net1 = MultiLayerNetwork(use_gui=True, outfolder=output_folder, midi_files=midi_files, preset_param="liu", verbosity=0)
 
     # Build net
     net1.create_net(separate_graphs=True, output_txt=True)

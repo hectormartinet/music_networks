@@ -1,7 +1,7 @@
 import wx
 
 class ParameterPicker(wx.Frame):
-    def __init__(self, parent, id, title, widgets_type, default_params, dependancy={}):
+    def __init__(self, parent, id, title, widgets_type, default_params, dependancy={}, widget_data={}):
         self.interval = 27
         self.width = 500
         self.height = self.interval*(len(default_params)+3)
@@ -13,6 +13,7 @@ class ParameterPicker(wx.Frame):
         ypos = 10
         self.params = default_params
         self.widgets = {}
+        self.widget_data = widget_data
         for param, value in default_params.items():
             w_type = widgets_type[param]
             if not w_type in self.widgets:
@@ -25,6 +26,9 @@ class ParameterPicker(wx.Frame):
                 self.create_number_picker(param, value, ypos)
             elif w_type == "file_picker":
                 self.create_file_picker(param, value, ypos)
+            elif w_type == "choice":
+                possible_values = widget_data[param]
+                self.create_choice(param, possible_values, value, ypos)
             else:
                 print("Widget not recognized")
                 assert(False)
@@ -84,7 +88,9 @@ class ParameterPicker(wx.Frame):
         self.widgets["number_picker"][name] = wx.TextCtrl(self.panel, -1, str(default), (15+size, ypos-3))
     
     def create_choice(self, name, values, default, ypos):
-        self.widgets["choice"][name] = wx.Choice(self.panel, -1, (10,ypos), choices = values, name=name)
+        text1 = wx.StaticText(self.panel, -1, name, (10, ypos))
+        size = text1.GetSize().x
+        self.widgets["choice"][name] = wx.Choice(self.panel, -1, (15+size,ypos), choices = values, name=name)
         n = values.index(default)
         self.widgets["choice"][name].SetSelection(n)
 
@@ -93,6 +99,8 @@ class ParameterPicker(wx.Frame):
             self.params[key] = checkbox.GetValue()
         for key, number_picker in self.widgets["number_picker"].items():
             self.params[key] = float(number_picker.GetValue())
+        for key, choice in self.widgets["choice"].items():
+            self.params[key] = self.widget_data[key][choice.GetSelection()]
         self.Close()
 
 #---------------------------------------------------------------------------
@@ -108,8 +116,7 @@ def get_parameters(default_params):
         "transpose":"checkbox",
         "strict_link":"checkbox",
         "max_link_time_diff":"number_picker",
-        "layer":"checkbox",
-        "flatten":"checkbox",
+        "structure":"choice",
         "diatonic_interval":"checkbox",
         "chromatic_interval":"checkbox",
         "chord_function":"checkbox",
@@ -121,15 +128,18 @@ def get_parameters(default_params):
         "outfolder":"folder_picker"
     }
 
+    widget_data = {
+        "structure":["multilayer", "monolayer", "chordify"]
+    }
+
     # parent_parameters:[(child_parameter, required_value),...]
     # Some parameters are only usefull when an other has a specific value
     dependancy = {
         "pitch": [("octave",True),("enharmony",True)],
         "offset": [("offset_period", True)],
-        "layer": [("strict_link",True)],
         "enharmony":[("diatonic_interval", False)]
     }
     app = wx.App(0)
-    picker = ParameterPicker(None, -1, 'Parameters', widgets_type, default_params, dependancy)
+    picker = ParameterPicker(None, -1, 'Parameters', widgets_type, default_params, dependancy, widget_data)
     app.MainLoop()
     return picker.params
