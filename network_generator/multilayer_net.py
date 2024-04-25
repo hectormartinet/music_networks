@@ -84,6 +84,7 @@ class MultiLayerNetwork:
             "split_chords":False,
             "duration_weighted_intergraph":True,
             "analyze_key":False,
+            "keep_extra":False,
             "midi_files":["midis/invent_bach/invent1.mid"],
             "outfolder":"results"
         }
@@ -214,7 +215,7 @@ class MultiLayerNetwork:
         if type(self.midi_files) != list:
             self.midi_files = [self.midi_files]
         self.duration_weighted_intergraph = params["duration_weighted_intergraph"]
-        self.keep_extra = True # TODO keep supplementary info or not (for large dataset, you don't want to have this)
+        self.keep_extra = params["keep_extra"]
         self.split_chords = params["split_chords"]
         self.analyze_key = params["analyze_key"] or self.transpose or self.chord_function
         for file_name in self.midi_files:

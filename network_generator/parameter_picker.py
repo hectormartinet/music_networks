@@ -124,6 +124,7 @@ def get_parameters(default_params):
         "split_chords":"checkbox",
         "duration_weighted_intergraph":"checkbox",
         "analyze_key":"checkbox",
+        "keep_extra":"checkbox",
         "midi_files":"file_picker",
         "outfolder":"folder_picker"
     }
