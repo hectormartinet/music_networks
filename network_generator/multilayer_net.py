@@ -250,8 +250,6 @@ class MultiLayerNetwork:
     def _is_ignored(self, elt):
         if not self.rest and elt.isRest:
             return True
-        if self.interval and elt.isChord:
-            return True
         return False
     
     def _parse_chord_function(self, elt):
@@ -302,11 +300,15 @@ class MultiLayerNetwork:
         return lst
     
     def _parse_interval(self, prev_elt, next_elt=None):
-        if next_elt is None or prev_elt["rest"] or prev_elt["chord"] or next_elt["rest"] or next_elt["chord"]:
+        if next_elt is None or prev_elt["rest"] or next_elt["rest"]:
             prev_elt["chromatic_interval"] = 0
             prev_elt["diatonic_interval"] = 0
             return
-        interval = ms.interval.Interval(ms.pitch.Pitch(prev_elt["pitch"]), ms.pitch.Pitch(next_elt["pitch"]))
+        def get_high_note_pitch(elt):
+            return ms.pitch.Pitch(elt["pitch"].split(" ")[-1])
+        prev_pitch = get_high_note_pitch(prev_elt)
+        next_pitch = get_high_note_pitch(next_elt)
+        interval = ms.interval.Interval(prev_pitch, next_pitch)
         prev_elt["diatonic_interval"] = interval.diatonic.generic.value
         prev_elt["chromatic_interval"] = interval.chromatic.semitones
 
