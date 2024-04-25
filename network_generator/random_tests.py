@@ -14,14 +14,18 @@ def randomize_args():
     args["pitch"] = rand_bool()
     args["duration"] = rand_bool()
     args["offset"] = rand_bool()
-    args["enharmony"] = rand_bool()
     args["offset_period"] = rd.randint(1,16)/4
+    args["enharmony"] = rand_bool()
     args["transpose"] = rand_bool()
     args["strict_link"] = rand_bool()
-    args["layer"] = rand_bool()
-    args["flatten"] = rand_bool()
+    args["structure"] = ["multilayer", "monolayer", "chordify"][rd.randint(0,2)]
     args["chromatic_interval"] = rand_bool()
     args["diatonic_interval"] = rand_bool()
+    args["chord_function"] = rand_bool()
+    args["group_by_beat"] = rand_bool()
+    args["split_chords"] = rand_bool()
+    args["duration_weighted_intergraph"] = rand_bool()
+    args["analyze_key"] = rand_bool()
     args["max_link_time_diff"] = rd.randint(1,16)/4
     return args
 
