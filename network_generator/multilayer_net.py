@@ -329,7 +329,7 @@ class MultiLayerNetwork:
             node["diatonic_interval"] = infos["diatonic_interval"]
         if self.chromatic_interval:
             node["chromatic_interval"] = infos["chromatic_interval"]
-        if self.multilayer:
+        if self.multilayer and self.nb_layers > 1:
             node["layer"] = infos["layer"]
         if self.chord_function:
             node["chord_function"] = infos["chord_function"]
@@ -430,7 +430,7 @@ class MultiLayerNetwork:
                     self.net.nodes[node][param] = [elt]
             add_attribute("layer", self.multilayer)
             add_attribute("pitch", self.pitch and self.octave)
-            add_attribute("pitch_class", self.pitch)
+            if not self.octave : add_attribute("pitch_class", self.pitch)
             add_attribute("chromatic_interval", self.chromatic_interval)
             add_attribute("diatonic_interval", self.diatonic_interval)
             add_attribute("duration", self.duration, float(infos["duration"]))
