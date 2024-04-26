@@ -449,7 +449,7 @@ class MultiLayerNetwork:
                             self.net.nodes[node][attribute].append(elt_to_add)
                 append_if_list("layer")
                 append_if_list("pitch")
-                append_if_list("pitch_class")
+                # append_if_list("pitch_class")
                 append_if_list("chromatic_interval")
                 append_if_list("diatonic_interval")
                 append_if_list("duration",float(infos["duration"]))
