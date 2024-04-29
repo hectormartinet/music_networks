@@ -166,6 +166,7 @@ class MultiLayerNetwork:
         self._print_if_useful("Loading new midi : " + midifilename, 2)
         self.timer.start("ms_midi_loading")
         whole_piece = ms.converter.parse(midifilename, quarterLengthDivisors = (16,))
+        self.nb_parts = len(whole_piece.parts)
         self.timer.end("ms_midi_loading")
         if self.analyze_key:
             self.original_key = whole_piece.flatten().analyze('key')
@@ -231,10 +232,10 @@ class MultiLayerNetwork:
     def nb_layers(self): return len(self.stream_list)
 
     @property
-    def chordify(self): return self.structure == "chordify"
+    def chordify(self): return self.structure == "chordify" and self.nb_parts > 1
 
     @property
-    def multilayer(self): return self.structure == "multilayer"
+    def multilayer(self): return self.structure == "multilayer" and self.nb_parts > 1
 
     def _stream_to_C(self, part):
         if self.original_key.mode == "major":
@@ -329,7 +330,7 @@ class MultiLayerNetwork:
             node["diatonic_interval"] = infos["diatonic_interval"]
         if self.chromatic_interval:
             node["chromatic_interval"] = infos["chromatic_interval"]
-        if self.multilayer and self.nb_layers > 1:
+        if self.multilayer:
             node["layer"] = infos["layer"]
         if self.chord_function:
             node["chord_function"] = infos["chord_function"]
@@ -360,7 +361,7 @@ class MultiLayerNetwork:
 
         for i in range(self.nb_layers):  # For each instrument
             self._process_intra_layer(i)
-        if self.multilayer and self.nb_layers > 1:
+        if self.multilayer:
             self._print_if_useful("[+] Creating network - Inter-layer processing", 2)
             self._process_inter_layer()
         self.timer.end("stream_to_network")
@@ -575,7 +576,7 @@ class MultiLayerNetwork:
         Returns:
             list[NetworkX]: The list of subnetworks
         """
-        if not self.multilayer or self.nb_layers <= 1:
+        if not self.multilayer:
             return [net]
         sub_nets =[]
         for i in range(self.nb_layers):
