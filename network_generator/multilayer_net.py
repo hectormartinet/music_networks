@@ -58,7 +58,8 @@ class MultiLayerNetwork:
                 - transpose(bool): Transpose the song in C major/ A minor depending on the mode based on the starting tonality. Defaults to False.
                 - enharmony(bool): Treat equivalent notes (e.g. C# and Db) as the same note. Defaults to True.
                 - group_by_beat(bool): Group the notes of each part by beat and set durations to 1. Defaults to False.
-
+                - order(int): Number of consecutive notes contained in one node. For example C D E F with order=2 will give the nodes (C,D)->(D,E)->(E,F).
+                
             Input/Output parameters:
                 - midi_files(list[str]): 
                   of midis to use.
