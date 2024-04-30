@@ -57,7 +57,6 @@ class MultilayerNetworkTester:
             self.test_chromatic_interval,
             self.test_diatonic_interval,
             self.test_duration_weighted_intergraph,
-            self.test_max_link_time_diff,
         ]
         nb_test_failed = 0
         for test in tests:

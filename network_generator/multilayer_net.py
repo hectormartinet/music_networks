@@ -78,6 +78,7 @@ class MultiLayerNetwork:
             "chord_function":False,
             "transpose":False,
             "structure":"multilayer",
+            "order":1,
             "strict_link":False,
             "max_link_time_diff":4.,
             "group_by_beat":False,
@@ -114,8 +115,6 @@ class MultiLayerNetwork:
 
         self.aggregated_sub_nets = []
         self.aggregated_intergraph = None
-
-        self.nodes_lists = []
         try:
             os.makedirs(self.outfolder)
         except:
@@ -191,11 +190,13 @@ class MultiLayerNetwork:
             self.group_notes_by_beat()
         self.timer.start("parsing_notes")
         self.parsed_stream_list = [self._build_parsed_list(part, i) for i,part in enumerate(self.stream_list)]
+        self.nodes_lists = [self._get_nodes_list(i) for i in range(self.nb_layers)]
         self.timer.end("parsing_notes")
         self.timer.end("load_new_midi")
 
 
     def _parse_params(self, **params):
+        self.order = int(params["order"])
         self.rest = params["rest"]
         self.pitch = params["pitch"]
         self.octave = params["octave"]
@@ -208,6 +209,8 @@ class MultiLayerNetwork:
         self.strict_link = params["strict_link"]
         self.max_link_time_diff = params["max_link_time_diff"]
         self.structure = params["structure"]
+        if self.structure == "multilayer" and self.order > 1:
+            self.structure = "monolayer"
         self.diatonic_interval = params["diatonic_interval"] and not self.enharmony
         self.chromatic_interval = params["chromatic_interval"]
         self.chord_function = params["chord_function"]
@@ -216,8 +219,8 @@ class MultiLayerNetwork:
         if type(self.midi_files) != list:
             self.midi_files = [self.midi_files]
         self.duration_weighted_intergraph = params["duration_weighted_intergraph"]
-        self.keep_extra = params["keep_extra"]
-        self.split_chords = params["split_chords"]
+        self.keep_extra = params["keep_extra"] and self.order == 1
+        self.split_chords = params["split_chords"] and self.order == 1
         self.analyze_key = params["analyze_key"] or self.transpose or self.chord_function
         for file_name in self.midi_files:
             assert(os.path.splitext(file_name)[1] in [".mid", ".musicxml"])
@@ -263,9 +266,9 @@ class MultiLayerNetwork:
         infos["layer"] = layer
         infos["rest"] = elt.isRest
         infos["chord"] = elt.isChord
-        infos["duration"] = elt.duration.quarterLength
-        infos["offset"] = elt.offset - self.offset_period*math.floor(elt.offset/self.offset_period)
-        infos["timestamp"] = elt.offset
+        infos["duration"] = float(elt.duration.quarterLength)
+        infos["offset"] = float(elt.offset - self.offset_period*math.floor(elt.offset/self.offset_period))
+        infos["timestamp"] = float(elt.offset)
         infos["pitch"] = self._parse_pitch(elt, octave=True)
         infos["pitch_class"] = self._parse_pitch(elt, octave=False)
         infos["chord_function"] = self._parse_chord_function(elt)
@@ -370,17 +373,19 @@ class MultiLayerNetwork:
     def _process_intra_layer(self, layer, prev_elt=None):
         if self.split_chords: return self._process_intra_layer_splited(layer, prev_elt)
         prev_node = self.build_node(prev_elt) if prev_elt is not None else None
-        for elt in self.parsed_stream_list[layer]:
-            node = self.build_node(elt)
+        for i in range(len(self.parsed_stream_list[layer])+1-self.order):
+            elt = self.parsed_stream_list[layer][i] if self.order==1 else self.parsed_stream_list[layer][i:i+self.order]
+            node = self.nodes_lists[layer][i] if self.order==1 else ",".join(self.nodes_lists[layer][i:i+self.order])
             self._add_or_update_node(node, elt)
             if prev_elt is not None:
-                time_diff = elt["timestamp"] - prev_elt["timestamp"] - prev_elt["duration"]
+                time_diff = 0 if self.order>1 else elt["timestamp"] - prev_elt["timestamp"] - prev_elt["duration"]
                 if time_diff <= self.max_link_time_diff: # TODO decide if the comparison should be strict (and change test accordingly)
                     self._add_or_update_edge(prev_node, node, inter=False)
             prev_node = node
             prev_elt = elt
 
     def _process_intra_layer_splited(self, layer, prev_elts=None):
+        assert(self.order == 1)
         prev_nodes = [self.build_node(elt) for elt in prev_elts] if prev_elts is not None else None
         for elts in self.parsed_stream_list[layer]:
             nodes = [self.build_node(elt) for elt in elts]
@@ -424,7 +429,7 @@ class MultiLayerNetwork:
             self.net.add_node(node, weight=1)
             def add_attribute(param, param_used, elt=None):
                 if elt is None:
-                    elt = infos[param]
+                    elt = infos[param] if self.order==1 else [info[param] for info in infos]
                 if param_used:
                     self.net.nodes[node][param] = elt
                 elif self.keep_extra:
@@ -434,9 +439,9 @@ class MultiLayerNetwork:
             if not self.octave : add_attribute("pitch_class", self.pitch)
             add_attribute("chromatic_interval", self.chromatic_interval)
             add_attribute("diatonic_interval", self.diatonic_interval)
-            add_attribute("duration", self.duration, float(infos["duration"]))
-            add_attribute("offset", self.offset, float(infos["offset"]))
-            add_attribute("timestamps", False,elt=float(infos["timestamp"]))
+            add_attribute("duration", self.duration)
+            add_attribute("offset", self.offset)
+            add_attribute("timestamps", False, infos["timestamp"] if self.order==1 else [info["timestamp"] for info in infos])
             add_attribute("rest", self.rest)
             add_attribute("chord_function", self.chord_function)
         else :
@@ -470,7 +475,7 @@ class MultiLayerNetwork:
         """
         Necessary step before exporting graph.
         """
-        if not self.keep_extra:return
+        if not self.keep_extra and self.order==1 :return
         for node in net.nodes:
             for attribute in net.nodes[node].keys():
                 if type(net.nodes[node][attribute]) == list :
@@ -504,7 +509,7 @@ class MultiLayerNetwork:
         """
         filepath,folder,filename = self._get_file_path(folder, filename)
         self._print_if_useful("[+] Writing " + str(self.nb_layers) + " graphml subnet files to : " + folder, 1)
-        for i in range(0,len(sub_nets)):
+        for i in range(len(sub_nets)):
             cur_out = filepath + "l_" + str(i) + ".graphml"
             nx.write_graphml(sub_nets[i], cur_out)
 
@@ -596,7 +601,9 @@ class MultiLayerNetwork:
         return nx.subgraph_view(net, filter_edge=filter)
     
     def _get_nodes_list(self, layer=0):
-        return [self.build_node(elt) for elt in self._get_flatten_stream(layer)]
+        if self.split_chords:
+            return [[self.build_node(elt) for elt in elt_list] for elt_list in self.parsed_stream_list[layer]]
+        return [self.build_node(elt) for elt in self.parsed_stream_list[layer]]
     
     def export_nodes_list(self, folder=None, filename=None, layer=0):
         """Export the list of nodes in the order they are played in the song
@@ -611,8 +618,12 @@ class MultiLayerNetwork:
             file_path += f"_nodesl_{layer}.txt"
         else:
             file_path +="_nodes.txt"
-        lst = self._get_nodes_list(layer)
-        open(file_path,"w").write("\n".join(lst))
+        if self.split_chords:
+            open(file_path,"w").write("\n".join([str(elt) for elt in self.nodes_lists[layer]]))
+        elif self.order==1:
+            open(file_path,"w").write("\n".join(self.nodes_lists[layer]))
+        else:
+            open(file_path,"w").write("\n".join([",".join(self.nodes_lists[layer][i:i+self.order]) for i in range(len(self.nodes_lists[layer])+1-self.order)]))
 
     
     def list_to_string(self,my_list):

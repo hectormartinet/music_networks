@@ -117,6 +117,7 @@ def get_parameters(default_params):
         "strict_link":"checkbox",
         "max_link_time_diff":"number_picker",
         "structure":"choice",
+        "order":"number_picker",
         "diatonic_interval":"checkbox",
         "chromatic_interval":"checkbox",
         "chord_function":"checkbox",
