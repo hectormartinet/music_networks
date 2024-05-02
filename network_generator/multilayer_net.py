@@ -289,7 +289,6 @@ class MultiLayerNetwork:
     def _build_parsed_list(self, part, i):
         lst = [self.parse_elt(elt,i) for elt in part.flatten().notesAndRests if not self._is_ignored(elt)]
         if not lst : return lst
-        def build_lst(elt): return elt if type(elt)==list else [elt]
         for i in range(len(lst)-1):
             if self.split_chords:
                 for prev_elt in lst[i]:
@@ -304,15 +303,16 @@ class MultiLayerNetwork:
             self._parse_interval(lst[len(lst)-1])
         return lst
     
+    def _get_high_note_pitch(self, elt):
+            return ms.pitch.Pitch(elt["pitch"].split(" ")[-1])
+
     def _parse_interval(self, prev_elt, next_elt=None):
         if next_elt is None or prev_elt["rest"] or next_elt["rest"]:
             prev_elt["chromatic_interval"] = "N/A"
             prev_elt["diatonic_interval"] = "N/A"
             return
-        def get_high_note_pitch(elt):
-            return ms.pitch.Pitch(elt["pitch"].split(" ")[-1])
-        prev_pitch = get_high_note_pitch(prev_elt)
-        next_pitch = get_high_note_pitch(next_elt)
+        prev_pitch = self._get_high_note_pitch(prev_elt)
+        next_pitch = self._get_high_note_pitch(next_elt)
         interval = ms.interval.Interval(prev_pitch, next_pitch)
         prev_elt["diatonic_interval"] = interval.diatonic.generic.value
         prev_elt["chromatic_interval"] = interval.chromatic.semitones
