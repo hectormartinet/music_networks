@@ -181,7 +181,6 @@ class MultiLayerNetwork:
         
 
     def load_new_midi(self, midifilename, whole_piece=None, key=None, original_key=None):
-        self.timer.start("parsing")
         self.stream_list = []
         self.parsed_stream_list = []
         self.instruments = []
@@ -190,7 +189,10 @@ class MultiLayerNetwork:
         self.midi_file = midifilename
         self._print_if_useful("Loading new midi : " + midifilename, 2)
         if whole_piece is None:
+            self.timer.start("load midi")
             whole_piece, self.key, self.original_key = MultiLayerNetwork.load_whole_piece(self.midi_file, self.analyze_key, self.chordify, self.transpose)
+            self.timer.end("load midi")
+        self.timer.start("parsing notes")
         if self.chordify:
             self.stream_list.append(whole_piece)
         else:
@@ -203,7 +205,7 @@ class MultiLayerNetwork:
             self.group_notes_by_beat()
         self.parsed_stream_list = [self._build_parsed_list(part, i) for i,part in enumerate(self.stream_list)]
         self.nodes_lists = [self._get_nodes_list(i) for i in range(self.nb_layers)]
-        self.timer.end("parsing")
+        self.timer.end("parsing notes")
 
 
     def _parse_params(self, **params):
@@ -233,7 +235,7 @@ class MultiLayerNetwork:
         self.split_chords = params["split_chords"] and self.order == 1
         self.analyze_key = params["analyze_key"] or self.transpose or self.chord_function
         for file_name in self.midi_files:
-            if not os.path.splitext(file_name)[1] in [".mid", ".musicxml", ".mxl"]:
+            if not os.path.splitext(file_name)[1] in [".mid", ".musicxml", ".mxl", ".xml"]:
                 raise Exception(f"{os.path.splitext(file_name)[1]} is not a correct file format")
         self.outfolder = params["outfolder"]
         if not self.outfolder.endswith(os.path.sep):
@@ -257,6 +259,8 @@ class MultiLayerNetwork:
     def _is_ignored(self, elt):
         if not self.rest and elt.isRest:
             return True
+        if isinstance(elt, ms.harmony.NoChord):
+            return True
         return False
     
     def _parse_chord_function(self, elt):
@@ -273,6 +277,8 @@ class MultiLayerNetwork:
         infos["offset"] = float(elt.offset - self.offset_period*math.floor(elt.offset/self.offset_period))
         infos["timestamp"] = float(elt.offset)
         infos["pitch"] = self._parse_pitch(elt, octave=True)
+        if infos["pitch"] == "":
+            print(elt)
         infos["pitch_class"] = self._parse_pitch(elt, octave=False)
         infos["chord_function"] = self._parse_chord_function(elt)
         if not self.split_chords:
@@ -306,7 +312,7 @@ class MultiLayerNetwork:
         return lst
     
     def _get_high_note_pitch(self, elt):
-            return ms.pitch.Pitch(elt["pitch"].split(" ")[-1])
+        return ms.pitch.Pitch(elt["pitch"].split(" ")[-1])
 
     def _parse_interval(self, prev_elt, next_elt=None):
         if next_elt is None or prev_elt["rest"] or next_elt["rest"]:
@@ -556,10 +562,10 @@ class MultiLayerNetwork:
                 low_idx = pool_idx*pool_size
                 high_idx = min((pool_idx+1)*pool_size, len(self.midi_files))
                 pool_input = [(file, self.analyze_key, self.chordify, self.transpose) for file in self.midi_files[low_idx:high_idx]]
-                self.timer.start("load_midi")
+                self.timer.start("load midi")
                 with Pool() as p:
                     parsed_pieces = p.starmap(MultiLayerNetwork.load_whole_piece, pool_input)
-                self.timer.end("load_midi")
+                self.timer.end("load midi")
                 for piece, midi_file_path in zip(parsed_pieces, self.midi_files[low_idx:high_idx]):
                     self._process_net(midi_file_path, separate_graphs, output_txt, piece[0], piece[1], piece[2])
                     pbar.update(1)
@@ -689,6 +695,7 @@ class MultiLayerNetwork:
                 - sub_net: Layers of the main net. As many sub_nets as the number of layers. Is not exported if there is only one layer (would be the same as the main net)
                 - intergraph: Graph of the interlayer edges between the layers. Only one intergraph per net. Is not exported if there is only one layer (would be empty)
         """
+        self.timer.start("exporting nets")
         if types == "all":
             types = ["main_net","sub_net","intergraph"]
         
@@ -712,6 +719,8 @@ class MultiLayerNetwork:
                 self._export_sub_nets(self.separated_sub_nets[name], filename=name)
             if "intergraph" in types:
                 self._export_intergraph(self.separated_intergraphs[name], filename=name)
+        self.timer.end("exporting nets")
+        
 
     
 
