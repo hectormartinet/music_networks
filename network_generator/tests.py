@@ -83,7 +83,7 @@ class MultilayerNetworkTester:
         net.get_net()
         net._get_sub_nets()
         net._get_nodes_list()
-        net1.convert_attributes_to_str()
+        net.convert_attributes_to_str()
     
     def make_test_folder(self):
         if not os.path.exists(self.test_folder):

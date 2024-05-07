@@ -2,6 +2,7 @@ import music21 as ms
 import networkx as nx
 import parameter_picker as par_pick
 from preset_params import get_preset_params
+from multiprocessing import Pool
 import multi_timer
 import os
 from tqdm import tqdm
@@ -141,6 +142,29 @@ class MultiLayerNetwork:
         if verbosity_level <= self.verbosity:
             print(message)
 
+    def stream_to_C(part, key):
+        if key.mode == "major":
+            i = ms.interval.Interval(key.tonic, ms.pitch.Pitch('C'))
+            new_key = ms.key.Key("C")
+        elif key.mode == "minor":
+            i = ms.interval.Interval(key.tonic, ms.pitch.Pitch('A'))
+            new_key = ms.key.Key("a")
+        else:
+            assert(False)
+        return part.transpose(i), new_key
+
+    def load_whole_piece(midifilename, analyze_key, chordify, transpose):
+        whole_piece = ms.converter.parse(midifilename, quarterLengthDivisors = (16,))
+        original_key = None
+        if analyze_key:
+            original_key = whole_piece.flatten().analyze('key')
+        key = original_key
+        if chordify and len(whole_piece.parts)>1:
+            whole_piece = whole_piece.chordify()
+        if transpose:
+            whole_piece, key = MultiLayerNetwork.stream_to_C(whole_piece, original_key)
+        return whole_piece, key, original_key
+
     def _get_flatten_stream(self, layer):
         if not self.split_chords:
             return self.parsed_stream_list[layer]
@@ -154,45 +178,31 @@ class MultiLayerNetwork:
 
     def _pick_parameters(self, params):
         return par_pick.get_parameters(params)
+        
 
-    def load_new_midi(self, midifilename):
+    def load_new_midi(self, midifilename, whole_piece=None, key=None, original_key=None):
         self.timer.start("load_new_midi")
         self.stream_list = []
         self.parsed_stream_list = []
         self.instruments = []
-        self.original_key = None
-        self.key = None
+        self.original_key = original_key
+        self.key = key
         self.midi_file = midifilename
         self._print_if_useful("Loading new midi : " + midifilename, 2)
-        self.timer.start("ms_midi_loading")
-        whole_piece = ms.converter.parse(midifilename, quarterLengthDivisors = (16,))
-        self.nb_parts = len(whole_piece.parts)
-        self.timer.end("ms_midi_loading")
-        if self.analyze_key:
-            self.original_key = whole_piece.flatten().analyze('key')
-            self._print_if_useful("analyzed key : " + str(self.original_key), 3)
-            self.key = self.original_key
+        if whole_piece is None:
+            whole_piece, self.key, self.original_key = MultiLayerNetwork.load_whole_piece(self.midi_file, self.analyze_key, self.chordify, self.transpose)
         if self.chordify:
-            whole_piece = whole_piece.chordify()
-            if self.transpose:
-                self.stream_list.append(self._stream_to_C(whole_piece))
-            else:
-                self.stream_list.append(whole_piece)
+            self.stream_list.append(whole_piece)
         else:
             for part in whole_piece.parts: # loads each channel/instrument into stream list
-                if self.transpose:
-                    self.stream_list.append(self._stream_to_C(part))
-                else:
-                    self.stream_list.append(part)
+                self.stream_list.append(part)
             for elt in whole_piece.recurse():
                 if 'Instrument' in elt.classes:
                     self.instruments.append(str(elt))
         if self.group_by_beat:
             self.group_notes_by_beat()
-        self.timer.start("parsing_notes")
         self.parsed_stream_list = [self._build_parsed_list(part, i) for i,part in enumerate(self.stream_list)]
         self.nodes_lists = [self._get_nodes_list(i) for i in range(self.nb_layers)]
-        self.timer.end("parsing_notes")
         self.timer.end("load_new_midi")
 
 
@@ -236,21 +246,10 @@ class MultiLayerNetwork:
     def nb_layers(self): return len(self.stream_list)
 
     @property
-    def chordify(self): return self.structure == "chordify" and self.nb_parts > 1
+    def chordify(self): return self.structure == "chordify"
 
     @property
-    def multilayer(self): return self.structure == "multilayer" and self.nb_parts > 1
-
-    def _stream_to_C(self, part):
-        if self.original_key.mode == "major":
-            i = ms.interval.Interval(self.original_key.tonic, ms.pitch.Pitch('C'))
-            self.key = ms.key.Key("C")
-        elif self.original_key.mode == "minor":
-            i = ms.interval.Interval(self.original_key.tonic, ms.pitch.Pitch('A'))
-            self.key = ms.key.Key("a")
-        else:
-            assert(False)
-        return part.transpose(i)
+    def multilayer(self): return self.structure == "multilayer" and self.nb_layers > 1
 
     def _is_ignored(self, elt):
         if not self.rest and elt.isRest:
@@ -521,7 +520,7 @@ class MultiLayerNetwork:
         cur_out = filepath + "_intergraph.graphml"
         nx.write_graphml(intergraph, cur_out)
 
-    def create_net(self, separate_graphs=False, output_txt=True):
+    def create_net(self, separate_graphs=False, output_txt=True, pool_size=100):
         """Create the main network
             Args:
                 - separate_graphs(bool): If set to True, create a net for every midi file, else create only one net where everything is aggregated
@@ -533,19 +532,27 @@ class MultiLayerNetwork:
         pbar = tqdm(total=nb_files)
         self.net = nx.DiGraph()
         self.separated_nets = {}
-        for midi_file_path in self.midi_files:
-            self.load_new_midi(midi_file_path)
-            self._stream_to_network()
-            name = os.path.splitext(os.path.basename(midi_file_path))[0]
-            if output_txt:
-                for i in range(self.nb_layers):
-                    self.export_nodes_list(filename=name, layer=i)
-            if separate_graphs:
-                self.separated_nets[name] = self.net
-                self.separated_sub_nets[name] = self._get_sub_nets(self.net)
-                self.separated_intergraphs[name] = self._get_intergraph(self.net)
-                self.net = nx.DiGraph()
-            pbar.update(1)
+        for pool_idx in range(math.ceil(len(self.midi_files)/pool_size)):
+            low_idx = pool_idx*pool_size
+            high_idx = min((pool_idx+1)*pool_size, len(self.midi_files))
+            pool_input = [(file, self.analyze_key, self.chordify, self.transpose) for file in self.midi_files[low_idx:high_idx]]
+            self.timer.start("load_midi")
+            with Pool() as p:
+                parsed_pieces = p.starmap(MultiLayerNetwork.load_whole_piece, pool_input)
+            self.timer.end("load_midi")
+            for piece, midi_file_path in zip(parsed_pieces, self.midi_files[low_idx:high_idx]):
+                self.load_new_midi(midi_file_path, piece[0], piece[1], piece[2])
+                self._stream_to_network()
+                name = os.path.splitext(os.path.basename(midi_file_path))[0]
+                if output_txt:
+                    for pool_idx in range(self.nb_layers):
+                        self.export_nodes_list(filename=name, layer=pool_idx)
+                if separate_graphs:
+                    self.separated_nets[name] = self.net
+                    self.separated_sub_nets[name] = self._get_sub_nets(self.net)
+                    self.separated_intergraphs[name] = self._get_intergraph(self.net)
+                    self.net = nx.DiGraph()
+                pbar.update(1)
         if not separate_graphs:
             self.aggregated_net = self.net
             self.aggregated_sub_nets = self._get_sub_nets(self.net)
@@ -698,13 +705,13 @@ if __name__ == "__main__" :
     output_folder = 'results'  # Replace with your desired output folder
     
     # Create the MultiLayerNetwork object with the MIDI file and output folder
-    net1 = MultiLayerNetwork(use_gui=True, outfolder=output_folder, midi_files=midi_files, preset_param="liu")
+    net = MultiLayerNetwork(use_gui=True, outfolder=output_folder, midi_files=midi_files, preset_param="liu")
 
     # Build net
-    net1.create_net(separate_graphs=True, output_txt=True)
+    net.create_net(separate_graphs=True, output_txt=True)
     
     # Export nets ('all' = main nets + subnets + intergraphs)
-    net1.export_nets()
+    net.export_nets()
 
     # Output processing times
-    # net1.timer.print_times()
+    net.timer.print_times()
