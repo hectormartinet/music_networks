@@ -649,18 +649,18 @@ class MultilayerNetworkTester:
         note2 = ms.note.Note("E##")
         note3 = ms.note.Note("D-")
         parsed_elt1 = net.parse_elt(note1)
-        parsed_elt1["diatonic_interval"] = 3
+        parsed_elt1["diatonic_interval"] = "N/A"
         parsed_elt2 = net.parse_elt(note2)
-        parsed_elt2["diatonic_interval"] = -2
+        parsed_elt2["diatonic_interval"] = 3
         parsed_elt3 = net.parse_elt(note3)
-        parsed_elt3["diatonic_interval"] = "N/A"
+        parsed_elt3["diatonic_interval"] = -2
         node1 = net.build_node(parsed_elt1)
         node2 = net.build_node(parsed_elt2)
         node3 = net.build_node(parsed_elt3)
         exp_graph = nx.DiGraph()
-        exp_graph.add_node(node1, weight=1, pitch_class="C", diatonic_interval = 3)
-        exp_graph.add_node(node2, weight=1, pitch_class="E##", diatonic_interval = -2)
-        exp_graph.add_node(node3, weight=1, pitch_class="D-", diatonic_interval = "N/A")
+        exp_graph.add_node(node1, weight=1, pitch_class="C", diatonic_interval = "N/A")
+        exp_graph.add_node(node2, weight=1, pitch_class="E##", diatonic_interval = 3)
+        exp_graph.add_node(node3, weight=1, pitch_class="D-", diatonic_interval = -2)
         exp_graph.add_edge(node1, node2, weight=1)
         exp_graph.add_edge(node2, node3, weight=1)
         self.assert_graph_match(graph, exp_graph)
@@ -683,18 +683,18 @@ class MultilayerNetworkTester:
         note2 = ms.note.Note("E")
         note3 = ms.note.Note("E-")
         parsed_elt1 = net.parse_elt(note1)
-        parsed_elt1["chromatic_interval"] = 4
+        parsed_elt1["chromatic_interval"] = "N/A"
         parsed_elt2 = net.parse_elt(note2)
-        parsed_elt2["chromatic_interval"] = -1
+        parsed_elt2["chromatic_interval"] = 4
         parsed_elt3 = net.parse_elt(note3)
-        parsed_elt3["chromatic_interval"] = "N/A"
+        parsed_elt3["chromatic_interval"] = -1
         node1 = net.build_node(parsed_elt1)
         node2 = net.build_node(parsed_elt2)
         node3 = net.build_node(parsed_elt3)
         exp_graph = nx.DiGraph()
-        exp_graph.add_node(node1, weight=1, pitch_class="C", chromatic_interval = 4)
-        exp_graph.add_node(node2, weight=1, pitch_class="E", chromatic_interval = -1)
-        exp_graph.add_node(node3, weight=1, pitch_class="E-", chromatic_interval = "N/A")
+        exp_graph.add_node(node1, weight=1, pitch_class="C", chromatic_interval = "N/A")
+        exp_graph.add_node(node2, weight=1, pitch_class="E", chromatic_interval = 4)
+        exp_graph.add_node(node3, weight=1, pitch_class="E-", chromatic_interval = -1)
         exp_graph.add_edge(node1, node2, weight=1)
         exp_graph.add_edge(node2, node3, weight=1)
         self.assert_graph_match(graph, exp_graph)

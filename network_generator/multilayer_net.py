@@ -62,8 +62,7 @@ class MultiLayerNetwork:
                 - order(int): Number of consecutive notes contained in one node. For example C D E F with order=2 will give the nodes (C,D)->(D,E)->(E,F).
                 
             Input/Output parameters:
-                - midi_files(list[str]): 
-                  of midis to use.
+                - midi_files(list[str]): list of midis to use. Convert automatically to a list of size one if the input is not a list.
                 - outfolder(str): Output folder for all the graphs.
         """
         # Default Parameters
@@ -91,6 +90,8 @@ class MultiLayerNetwork:
             "midi_files":["midis/invent_bach/invent1.mid"],
             "outfolder":"results"
         }
+        if kwargs["midi_files"] is not None and type(kwargs["midi_files"]) != list:
+            kwargs["midi_files"] = [kwargs["midi_files"]]
         if preset_param is not None:
             self._overwrite_params(params, **get_preset_params(preset_param))
         self._overwrite_params(params, **kwargs)
@@ -153,7 +154,7 @@ class MultiLayerNetwork:
             assert(False)
         return part.transpose(i), new_key
 
-    def load_whole_piece(midifilename, analyze_key, chordify, transpose):
+    def load_whole_piece(midifilename, analyze_key=False, chordify=False, transpose=False):
         whole_piece = ms.converter.parse(midifilename, quarterLengthDivisors = (16,))
         original_key = None
         if analyze_key:
@@ -277,8 +278,6 @@ class MultiLayerNetwork:
         infos["offset"] = float(elt.offset - self.offset_period*math.floor(elt.offset/self.offset_period))
         infos["timestamp"] = float(elt.offset)
         infos["pitch"] = self._parse_pitch(elt, octave=True)
-        if infos["pitch"] == "":
-            print(elt)
         infos["pitch_class"] = self._parse_pitch(elt, octave=False)
         infos["chord_function"] = self._parse_chord_function(elt)
         if not self.split_chords:
@@ -297,6 +296,11 @@ class MultiLayerNetwork:
     def _build_parsed_list(self, part, i):
         lst = [self.parse_elt(elt,i) for elt in part.flatten().notesAndRests if not self._is_ignored(elt)]
         if not lst : return lst
+        if self.split_chords:
+            for elt in lst[0]:
+                self._parse_interval(None, elt)
+        else:
+            self._parse_interval(None, lst[0])
         for i in range(len(lst)-1):
             if self.split_chords:
                 for prev_elt in lst[i]:
@@ -304,26 +308,21 @@ class MultiLayerNetwork:
                         self._parse_interval(prev_elt, next_elt)
             else:
                 self._parse_interval(lst[i], lst[i+1])
-        if self.split_chords:
-            for elt in lst[len(lst)-1]:
-                self._parse_interval(elt)
-        else:
-            self._parse_interval(lst[len(lst)-1])
         return lst
     
     def _get_high_note_pitch(self, elt):
         return ms.pitch.Pitch(elt["pitch"].split(" ")[-1])
 
-    def _parse_interval(self, prev_elt, next_elt=None):
-        if next_elt is None or prev_elt["rest"] or next_elt["rest"]:
-            prev_elt["chromatic_interval"] = "N/A"
-            prev_elt["diatonic_interval"] = "N/A"
+    def _parse_interval(self, prev_elt=None, next_elt=None):
+        if prev_elt is None or next_elt is None or next_elt["rest"] or prev_elt["rest"]:
+            next_elt["chromatic_interval"] = "N/A"
+            next_elt["diatonic_interval"] = "N/A"
             return
-        prev_pitch = self._get_high_note_pitch(prev_elt)
         next_pitch = self._get_high_note_pitch(next_elt)
+        prev_pitch = self._get_high_note_pitch(prev_elt)
         interval = ms.interval.Interval(prev_pitch, next_pitch)
-        prev_elt["diatonic_interval"] = interval.diatonic.generic.value
-        prev_elt["chromatic_interval"] = interval.chromatic.semitones
+        next_elt["diatonic_interval"] = interval.diatonic.generic.value
+        next_elt["chromatic_interval"] = interval.chromatic.semitones
 
     def build_node(self, infos):
         node = {}
@@ -540,7 +539,6 @@ class MultiLayerNetwork:
             self.separated_nets[name] = self.net
             self.separated_sub_nets[name] = self._get_sub_nets(self.net)
             self.separated_intergraphs[name] = self._get_intergraph(self.net)
-            self.net = nx.DiGraph()
 
     def create_net(self, separate_graphs=False, output_txt=True, parallel=False, pool_size=100):
         """Create the main network
@@ -573,6 +571,8 @@ class MultiLayerNetwork:
             for midi_file_path in self.midi_files:
                 self._process_net(midi_file_path, separate_graphs, output_txt)
                 pbar.update(1)
+                if separate_graphs:
+                    self.net = nx.DiGraph()
         if not separate_graphs:
             self.aggregated_net = self.net
             self.aggregated_sub_nets = self._get_sub_nets(self.net)
