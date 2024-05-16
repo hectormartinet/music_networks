@@ -40,8 +40,8 @@ class MultiLayerNetwork:
                 - octave(bool): Octave of the note. Defaults to False.
                 - duration(bool): Duration of the note in quarter notes. Defaults to False.
                 - offset(bool), offset_period(float): The offset of the note modulo the offset_period. Defaults to False, 1.
-                - chromatic_interval(bool): Chromatic interval with the next note. Defaults to False.
-                - diatonic_interval(bool): Diatonic interval with the next note. Defaults to False.
+                - chromatic_interval(bool): Chromatic interval with the previous note. Defaults to False.
+                - diatonic_interval(bool): Diatonic interval with the previous note. Defaults to False.
                 - chord_function(bool): Give the corresponding degree of the chord
 
             Edge parameters: To know when two nodes are linked
