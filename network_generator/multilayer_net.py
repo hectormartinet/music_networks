@@ -433,8 +433,8 @@ class MultiLayerNetwork:
                 j += 1
 
     def _add_or_update_node(self, node, infos, layer):
+        total_duration = infos["duration"] if self.order==1 else sum([info["duration"] for info in infos])
         if not self.net.has_node(node):
-            total_duration = infos["duration"] if self.order==1 else sum([info["duration"] for info in infos])
             self.net.add_node(node, weight=1, duration_weight=total_duration)
             def add_attribute(param, param_used, elt=None):
                 if elt is None:
@@ -456,6 +456,7 @@ class MultiLayerNetwork:
             add_attribute("chord_function", self.chord_function)
         else :
             self.net.nodes[node]["weight"] += 1
+            self.net.nodes[node]["duration_weight"] += total_duration
             if self.keep_extra:
                 def append_if_list(attribute, elt_to_add=None):
                     if type(self.net.nodes[node][attribute]) == list:

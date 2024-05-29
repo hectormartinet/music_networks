@@ -57,7 +57,8 @@ class MultilayerNetworkTester:
             self.test_chromatic_interval,
             self.test_diatonic_interval,
             self.test_duration_weighted_intergraph,
-            self.test_order
+            self.test_order,
+            self.test_duration_weighted
         ]
         nb_test_failed = 0
         for test in tests:
@@ -853,6 +854,32 @@ class MultilayerNetworkTester:
         exp_graph.add_edge(node1, node1)
         exp_graph.add_edge(node1, node2)
         exp_graph.add_edge(node2, node3)
+        self.assert_graph_match(graph, exp_graph)
+
+    def test_duration_weighted(self):
+
+        self.current_test = "duration_weighted"
+
+        # Create midi file
+        stream = ms.converter.parse("tinyNotation: C8 C4 E4")
+        file_path = self.test_folder + self.current_test + ".mid"
+        stream.write("midi", file_path)
+
+        # Create net
+        net = MultiLayerNetwork(use_gui=False, verbosity=0, midi_files=file_path, pitch=True)
+        net.create_net(output_txt=False)
+        graph = net.get_net()
+
+        # Create expected graph
+        note1 = ms.note.Note("C")
+        note2 = ms.note.Note("E")
+        node1 = net.build_node(net.parse_elt(note1))
+        node2 = net.build_node(net.parse_elt(note2))
+        exp_graph = nx.DiGraph()
+        exp_graph.add_node(node1, weight=2, duration_weight=1.5)
+        exp_graph.add_node(node2, weight=1, duration_weight=1)
+        exp_graph.add_edge(node1, node1, weight=1)
+        exp_graph.add_edge(node1, node2, weight=1)
         self.assert_graph_match(graph, exp_graph)
 
 if __name__ == "__main__":
