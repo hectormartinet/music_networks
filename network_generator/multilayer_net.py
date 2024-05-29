@@ -384,7 +384,7 @@ class MultiLayerNetwork:
         for i in range(len(self.parsed_stream_list[layer])+1-self.order):
             elt = self.parsed_stream_list[layer][i] if self.order==1 else self.parsed_stream_list[layer][i:i+self.order]
             node = self.nodes_lists[layer][i] if self.order==1 else ",".join(self.nodes_lists[layer][i:i+self.order])
-            self._add_or_update_node(node, elt)
+            self._add_or_update_node(node, elt, layer)
             if prev_elt is not None:
                 time_diff = 0 if self.order>1 else elt["timestamp"] - prev_elt["timestamp"] - prev_elt["duration"]
                 if time_diff <= self.max_link_time_diff: # TODO decide if the comparison should be strict (and change test accordingly)
@@ -398,7 +398,7 @@ class MultiLayerNetwork:
         for elts in self.parsed_stream_list[layer]:
             nodes = [self.build_node(elt) for elt in elts]
             for node, elt in zip(nodes, elts):
-                self._add_or_update_node(node, elt)
+                self._add_or_update_node(node, elt, layer)
             if prev_elts is not None:
                 time_diff = elts[0]["timestamp"] - prev_elts[0]["timestamp"] - prev_elts[0]["duration"]
                 if time_diff <= self.max_link_time_diff:
@@ -432,9 +432,10 @@ class MultiLayerNetwork:
                     self._add_or_update_edge(node2, node, inter=True, weight=weight)
                 j += 1
 
-    def _add_or_update_node(self, node, infos):
+    def _add_or_update_node(self, node, infos, layer):
         if not self.net.has_node(node):
-            self.net.add_node(node, weight=1)
+            total_duration = infos["duration"] if self.order==1 else sum([info["duration"] for info in infos])
+            self.net.add_node(node, weight=1, duration_weight=total_duration)
             def add_attribute(param, param_used, elt=None):
                 if elt is None:
                     elt = infos[param] if self.order==1 else [info[param] for info in infos]
@@ -442,7 +443,8 @@ class MultiLayerNetwork:
                     self.net.nodes[node][param] = elt
                 elif self.keep_extra:
                     self.net.nodes[node][param] = [elt]
-            add_attribute("layer", self.multilayer)
+            if self.order==1 or "layer" not in self.net.nodes[node]:
+                add_attribute("layer", self.multilayer, elt=layer)
             add_attribute("pitch", self.pitch and self.octave)
             if not self.octave : add_attribute("pitch_class", self.pitch)
             add_attribute("chromatic_interval", self.chromatic_interval)
