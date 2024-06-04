@@ -168,8 +168,8 @@ class MultiLayerNetwork:
 
     def _get_flatten_stream(self, layer):
         if not self.split_chords:
-            return self.parsed_stream_list[layer]
-        return [elt for sub_lst in self.parsed_stream_list[layer] for elt in sub_lst]
+            return self.parsed_nodes[layer]
+        return [elt for sub_lst in self.parsed_nodes[layer] for elt in sub_lst]
 
     def _overwrite_params(self, current_params, **new_params):
         for key in current_params.keys():
@@ -183,7 +183,7 @@ class MultiLayerNetwork:
 
     def load_new_midi(self, midifilename, whole_piece=None, key=None, original_key=None):
         self.stream_list = []
-        self.parsed_stream_list = []
+        self.parsed_nodes = []
         self.instruments = []
         self.original_key = original_key
         self.key = key
@@ -198,14 +198,16 @@ class MultiLayerNetwork:
             self.stream_list.append(whole_piece)
         else:
             for part in whole_piece.parts: # loads each channel/instrument into stream list
-                self.stream_list.append(part)
+                self.stream_list.append(part.chordify())
             for elt in whole_piece.recurse():
                 if 'Instrument' in elt.classes:
                     self.instruments.append(str(elt))
         if self.group_by_beat:
             self.group_notes_by_beat()
-        self.parsed_stream_list = [self._build_parsed_list(part, i) for i,part in enumerate(self.stream_list)]
+        self.parsed_nodes = [self._build_parsed_list(part, i) for i,part in enumerate(self.stream_list)]
+        self.parsed_edges = [self._build_edges_list(parsed_nodes,i) for i,parsed_nodes in enumerate(self.parsed_nodes)]
         self.nodes_lists = [self._get_nodes_list(i) for i in range(self.nb_layers)]
+        self.edges_lists = [self._get_edges_list(i) for i in range(self.nb_layers)]
         self.timer.end("parsing notes")
 
 
@@ -294,35 +296,34 @@ class MultiLayerNetwork:
         return info_lst
 
     def _build_parsed_list(self, part, i):
-        lst = [self.parse_elt(elt,i) for elt in part.flatten().notesAndRests if not self._is_ignored(elt)]
-        if not lst : return lst
-        if self.split_chords:
-            for elt in lst[0]:
-                self._parse_interval(None, elt)
-        else:
-            self._parse_interval(None, lst[0])
-        for i in range(len(lst)-1):
-            if self.split_chords:
-                for prev_elt in lst[i]:
-                    for next_elt in lst[i+1]:
-                        self._parse_interval(prev_elt, next_elt)
-            else:
-                self._parse_interval(lst[i], lst[i+1])
-        return lst
+        return [self.parse_elt(elt,i) for elt in part.flatten().notesAndRests if not self._is_ignored(elt)]
     
+    def _build_edges_list(self, lst_nodes, i):
+        if not self.split_chords:
+            return [self._parse_interval(lst_nodes[i], lst_nodes[i+1]) for i in range(len(lst_nodes)-1)]
+        lst_edges = []
+        for i in range(len(lst_nodes)-1):
+            if self.split_chords:
+                for prev_elt in lst_nodes[i]:
+                    for next_elt in lst_nodes[i+1]:
+                        self._parse_interval(prev_elt, next_elt)
+        return lst_edges
+
     def _get_high_note_pitch(self, elt):
         return ms.pitch.Pitch(elt["pitch"].split(" ")[-1])
 
     def _parse_interval(self, prev_elt=None, next_elt=None):
+        elt = {}
         if prev_elt is None or next_elt is None or next_elt["rest"] or prev_elt["rest"]:
-            next_elt["chromatic_interval"] = "N/A"
-            next_elt["diatonic_interval"] = "N/A"
-            return
+            elt["chromatic_interval"] = "N/A"
+            elt["diatonic_interval"] = "N/A"
+            return elt
         next_pitch = self._get_high_note_pitch(next_elt)
         prev_pitch = self._get_high_note_pitch(prev_elt)
         interval = ms.interval.Interval(prev_pitch, next_pitch)
-        next_elt["diatonic_interval"] = interval.diatonic.generic.value
-        next_elt["chromatic_interval"] = interval.chromatic.semitones
+        elt["diatonic_interval"] = interval.diatonic.generic.value
+        elt["chromatic_interval"] = interval.chromatic.semitones
+        return elt
 
     def build_node(self, infos):
         node = {}
@@ -337,16 +338,20 @@ class MultiLayerNetwork:
             node["duration"] = infos["duration"]
         if self.offset:
             node["offset"] = infos["offset"]
-        if self.diatonic_interval:
-            node["diatonic_interval"] = infos["diatonic_interval"]
-        if self.chromatic_interval:
-            node["chromatic_interval"] = infos["chromatic_interval"]
         if self.multilayer:
             node["layer"] = infos["layer"]
         if self.chord_function:
             node["chord_function"] = infos["chord_function"]
         return json.dumps(node)
     
+    def build_edge(self, infos):
+        edge = {}
+        if self.diatonic_interval:
+            edge["diatonic_interval"] = infos["diatonic_interval"]
+        if self.chromatic_interval:
+            edge["chromatic_interval"] = infos["chromatic_interval"]
+        return json.dumps(edge)
+        
     def _parse_pitch(self, elt, octave):
         if elt.isNote:
             return self._pitch_to_str(elt.pitch, octave)
@@ -378,35 +383,34 @@ class MultiLayerNetwork:
         self.timer.end("stream_to_network")
         return self.net
 
-    def _process_intra_layer(self, layer, prev_elt=None):
-        if self.split_chords: return self._process_intra_layer_splited(layer, prev_elt)
-        prev_node = self.build_node(prev_elt) if prev_elt is not None else None
-        for i in range(len(self.parsed_stream_list[layer])+1-self.order):
-            elt = self.parsed_stream_list[layer][i] if self.order==1 else self.parsed_stream_list[layer][i:i+self.order]
-            node = self.nodes_lists[layer][i] if self.order==1 else ",".join(self.nodes_lists[layer][i:i+self.order])
-            self._add_or_update_node(node, elt, layer)
-            if prev_elt is not None:
-                time_diff = 0 if self.order>1 else elt["timestamp"] - prev_elt["timestamp"] - prev_elt["duration"]
+    def _process_intra_layer(self, layer, prev_node=None, end_time=None):
+        if self.split_chords: return self._process_intra_layer_splited(layer, prev_node, end_time)
+        for i in range(len(self.parsed_nodes[layer])+1-self.order):
+            node_info = self.parsed_nodes[layer][i:i+self.order]
+            edge_info = self.parsed_edges[layer][i:i+self.order-1]
+            node = self.nodes_lists[layer][i] if self.order==1 else ",".join(self.nodes_lists[layer][i:i+self.order]+self.edges_lists[layer][i:i+self.order-1])
+            self._add_or_update_node(node, node_info, layer, edge_info)
+            if end_time is not None:
+                time_diff = 0 if self.order>1 else node_info[0]["timestamp"] - end_time # TODO handle correctly when order > 2
                 if time_diff <= self.max_link_time_diff: # TODO decide if the comparison should be strict (and change test accordingly)
-                    self._add_or_update_edge(prev_node, node, inter=False)
+                        self._add_or_update_edge(prev_node, node, inter=False)
             prev_node = node
-            prev_elt = elt
+            end_time = node_info[-1]["timestamp"] + node_info[-1]["duration"]
 
-    def _process_intra_layer_splited(self, layer, prev_elts=None):
+    def _process_intra_layer_splited(self, layer, prev_nodes=None, end_time=None):
         assert(self.order == 1)
-        prev_nodes = [self.build_node(elt) for elt in prev_elts] if prev_elts is not None else None
-        for elts in self.parsed_stream_list[layer]:
+        for elts in self.parsed_nodes[layer]:
             nodes = [self.build_node(elt) for elt in elts]
             for node, elt in zip(nodes, elts):
-                self._add_or_update_node(node, elt, layer)
-            if prev_elts is not None:
-                time_diff = elts[0]["timestamp"] - prev_elts[0]["timestamp"] - prev_elts[0]["duration"]
+                self._add_or_update_node(node, [elt], layer)
+            if end_time is not None:
+                time_diff = elts[0]["timestamp"] - end_time
                 if time_diff <= self.max_link_time_diff:
                     for node in nodes:
                         for prev_node in prev_nodes:
                             self._add_or_update_edge(prev_node, node, inter=False)
             prev_nodes = nodes
-            prev_elts = elts
+            end_time = elts[0]["timestamp"] + elts[0]["duration"]
     
     def _process_inter_layer(self):
         all_nodes_infos = [elt for layer in range(self.nb_layers) for elt in self._get_flatten_stream(layer)]
@@ -432,13 +436,20 @@ class MultiLayerNetwork:
                     self._add_or_update_edge(node2, node, inter=True, weight=weight)
                 j += 1
 
-    def _add_or_update_node(self, node, infos, layer):
-        total_duration = infos["duration"] if self.order==1 else sum([info["duration"] for info in infos])
+    def _add_or_update_node(self, node, node_info, layer, edge_info=None):
+        if edge_info is None:
+            edge_info = {}
+        total_duration = sum([info["duration"] for info in node_info])
         if not self.net.has_node(node):
             self.net.add_node(node, weight=1, duration_weight=total_duration)
-            def add_attribute(param, param_used, elt=None):
+            def add_attribute(param, param_used, elt=None, is_node_info=True):
                 if elt is None:
-                    elt = infos[param] if self.order==1 else [info[param] for info in infos]
+                    if is_node_info:
+                        elt = [info[param] for info in node_info]
+                    else:
+                        elt = [info[param] for info in edge_info]
+                if type(elt)==list and len(elt) == 1:
+                    elt = elt[0]
                 if param_used:
                     self.net.nodes[node][param] = elt
                 elif self.keep_extra:
@@ -447,13 +458,13 @@ class MultiLayerNetwork:
                 add_attribute("layer", self.multilayer, elt=layer)
             add_attribute("pitch", self.pitch and self.octave)
             if not self.octave : add_attribute("pitch_class", self.pitch)
-            add_attribute("chromatic_interval", self.chromatic_interval)
-            add_attribute("diatonic_interval", self.diatonic_interval)
             add_attribute("duration", self.duration)
             add_attribute("offset", self.offset)
-            add_attribute("timestamps", False, infos["timestamp"] if self.order==1 else [info["timestamp"] for info in infos])
+            add_attribute("timestamps", False, [info["timestamp"] for info in node_info])
             add_attribute("rest", self.rest)
             add_attribute("chord_function", self.chord_function)
+            add_attribute("chromatic_interval", self.chromatic_interval, is_node_info=False)
+            add_attribute("diatonic_interval", self.diatonic_interval, is_node_info=False)
         else :
             self.net.nodes[node]["weight"] += 1
             self.net.nodes[node]["duration_weight"] += total_duration
@@ -461,19 +472,19 @@ class MultiLayerNetwork:
                 def append_if_list(attribute, elt_to_add=None):
                     if type(self.net.nodes[node][attribute]) == list:
                         if elt_to_add is None:
-                            self.net.nodes[node][attribute].append(infos[attribute])
+                            self.net.nodes[node][attribute].append(node_info[attribute])
                         else:
                             self.net.nodes[node][attribute].append(elt_to_add)
                 append_if_list("layer")
                 append_if_list("pitch")
                 # append_if_list("pitch_class")
-                append_if_list("chromatic_interval")
-                append_if_list("diatonic_interval")
-                append_if_list("duration",float(infos["duration"]))
-                append_if_list("offset", float(infos["offset"]))
+                # append_if_list("chromatic_interval")
+                # append_if_list("diatonic_interval")
+                append_if_list("duration",float(node_info["duration"]))
+                append_if_list("offset", float(node_info["offset"]))
                 append_if_list("rest")
                 append_if_list("chord_function")
-                self.net.nodes[node]["timestamps"].append(float(infos["timestamp"]))
+                self.net.nodes[node]["timestamps"].append(float(node_info["timestamp"]))
     
     def _add_or_update_edge(self, from_node, to_node, inter, weight=1):
         if from_node is None or to_node is None: return
@@ -633,9 +644,14 @@ class MultiLayerNetwork:
     
     def _get_nodes_list(self, layer=0):
         if self.split_chords:
-            return [[self.build_node(elt) for elt in elt_list] for elt_list in self.parsed_stream_list[layer]]
-        return [self.build_node(elt) for elt in self.parsed_stream_list[layer]]
+            return [[self.build_node(elt) for elt in elt_list] for elt_list in self.parsed_nodes[layer]]
+        return [self.build_node(elt) for elt in self.parsed_nodes[layer]]
     
+    def _get_edges_list(self, layer=0):
+        if self.split_chords:
+            return [[self.build_edge(elt) for elt in elt_list] for elt_list in self.parsed_edges[layer]]
+        return [self.build_edge(elt) for elt in self.parsed_edges[layer]]
+
     def export_nodes_list(self, folder=None, filename=None, layer=0):
         """Export the list of nodes in the order they are played in the song
 

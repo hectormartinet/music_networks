@@ -641,29 +641,17 @@ class MultilayerNetworkTester:
         stream.write("musicxml", file_path)
 
         # Create net
-        net = MultiLayerNetwork(use_gui=False, verbosity=0, midi_files=file_path, diatonic_interval=True, enharmony=False)
+        net = MultiLayerNetwork(use_gui=False, verbosity=0, midi_files=file_path, diatonic_interval=True, enharmony=False, pitch=False, order=2)
         net.create_net(output_txt=False)
         graph = net.get_net()
 
         # Create expected graph
-        note1 = ms.note.Note("C")
-        note2 = ms.note.Note("E##")
-        note3 = ms.note.Note("D-")
-        parsed_elt1 = net.parse_elt(note1)
-        parsed_elt1["diatonic_interval"] = "N/A"
-        parsed_elt2 = net.parse_elt(note2)
-        parsed_elt2["diatonic_interval"] = 3
-        parsed_elt3 = net.parse_elt(note3)
-        parsed_elt3["diatonic_interval"] = -2
-        node1 = net.build_node(parsed_elt1)
-        node2 = net.build_node(parsed_elt2)
-        node3 = net.build_node(parsed_elt3)
+        node1 = "{},{}," + net.build_edge({"diatonic_interval":3})
+        node2 = "{},{}," + net.build_edge({"diatonic_interval":-2})
         exp_graph = nx.DiGraph()
-        exp_graph.add_node(node1, weight=1, pitch_class="C", diatonic_interval = "N/A")
-        exp_graph.add_node(node2, weight=1, pitch_class="E##", diatonic_interval = 3)
-        exp_graph.add_node(node3, weight=1, pitch_class="D-", diatonic_interval = -2)
+        exp_graph.add_node(node1, weight=1, diatonic_interval = 3)
+        exp_graph.add_node(node2, weight=1, diatonic_interval = -2)
         exp_graph.add_edge(node1, node2, weight=1)
-        exp_graph.add_edge(node2, node3, weight=1)
         self.assert_graph_match(graph, exp_graph)
 
 
@@ -675,29 +663,17 @@ class MultilayerNetworkTester:
         stream.write("midi", file_path)
 
         # Create net
-        net = MultiLayerNetwork(use_gui=False, verbosity=0, midi_files=file_path, chromatic_interval=True)
+        net = MultiLayerNetwork(use_gui=False, verbosity=0, midi_files=file_path, chromatic_interval=True, order=2, pitch=False)
         net.create_net(output_txt=False)
         graph = net.get_net()
 
         # Create expected graph
-        note1 = ms.note.Note("C")
-        note2 = ms.note.Note("E")
-        note3 = ms.note.Note("E-")
-        parsed_elt1 = net.parse_elt(note1)
-        parsed_elt1["chromatic_interval"] = "N/A"
-        parsed_elt2 = net.parse_elt(note2)
-        parsed_elt2["chromatic_interval"] = 4
-        parsed_elt3 = net.parse_elt(note3)
-        parsed_elt3["chromatic_interval"] = -1
-        node1 = net.build_node(parsed_elt1)
-        node2 = net.build_node(parsed_elt2)
-        node3 = net.build_node(parsed_elt3)
+        node1 = "{},{},"+ net.build_edge({"chromatic_interval":4})
+        node2 = "{},{},"+ net.build_edge({"chromatic_interval":-1})
         exp_graph = nx.DiGraph()
-        exp_graph.add_node(node1, weight=1, pitch_class="C", chromatic_interval = "N/A")
-        exp_graph.add_node(node2, weight=1, pitch_class="E", chromatic_interval = 4)
-        exp_graph.add_node(node3, weight=1, pitch_class="E-", chromatic_interval = -1)
+        exp_graph.add_node(node1, weight=1, chromatic_interval = 4)
+        exp_graph.add_node(node2, weight=1, chromatic_interval = -1)
         exp_graph.add_edge(node1, node2, weight=1)
-        exp_graph.add_edge(node2, node3, weight=1)
         self.assert_graph_match(graph, exp_graph)
     
     def test_split_chords(self):
@@ -843,10 +819,9 @@ class MultilayerNetworkTester:
         single_node1 = net.build_node(net.parse_elt(note1))
         single_node2 = net.build_node(net.parse_elt(note2))
         single_node3 = net.build_node(net.parse_elt(note3))
-        node1 = single_node1 + "," + single_node1
-        node2 = single_node1 + "," + single_node2
-        node3 = single_node2 + "," + single_node3
-        
+        node1 = single_node1 + "," + single_node1 + ",{}"
+        node2 = single_node1 + "," + single_node2 + ",{}"
+        node3 = single_node2 + "," + single_node3 + ",{}"
         exp_graph = nx.DiGraph()
         exp_graph.add_node(node1, weight=2, pitch_class=["C","C"])
         exp_graph.add_node(node2, weight=1, pitch_class=["C","D"])
