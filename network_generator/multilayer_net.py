@@ -114,10 +114,12 @@ class MultiLayerNetwork:
         self.separated_intergraphs = {}
 
         self.aggregated_net = nx.DiGraph()
-        """NetworkX: Agregated network from every midi file"""
+        """NetworkX: Aggregated network from every midi file"""
 
         self.aggregated_sub_nets = []
         self.aggregated_intergraph = None
+
+        self.last_visit_id = {}
         try:
             os.makedirs(self.outfolder)
         except:
@@ -257,7 +259,7 @@ class MultiLayerNetwork:
     def multilayer(self): return self.structure == "multilayer" and self.nb_layers > 1
 
     @property
-    def interlayering(self): return self.multilayer and self.order <= 1
+    def interlayering(self): return self.multilayer
 
     def _is_ignored(self, elt):
         if not self.rest and elt.isRest:
@@ -384,12 +386,13 @@ class MultiLayerNetwork:
         return self.net
 
     def _process_intra_layer(self, layer, prev_node=None, end_time=None):
+        self.last_visit_id = {}
         if self.split_chords: return self._process_intra_layer_splited(layer, prev_node, end_time)
         for i in range(len(self.parsed_nodes[layer])+1-self.order):
             node_info = self.parsed_nodes[layer][i:i+self.order]
             edge_info = self.parsed_edges[layer][i:i+self.order-1]
             node = self.nodes_lists[layer][i] if self.order==1 else ",".join(self.nodes_lists[layer][i:i+self.order]+self.edges_lists[layer][i:i+self.order-1])
-            self._add_or_update_node(node, node_info, layer, edge_info)
+            self._add_or_update_node(node, node_info, layer, i, edge_info)
             if end_time is not None:
                 time_diff = 0 if self.order>1 else node_info[0]["timestamp"] - end_time # TODO handle correctly when order > 2
                 if time_diff <= self.max_link_time_diff: # TODO decide if the comparison should be strict (and change test accordingly)
@@ -413,22 +416,23 @@ class MultiLayerNetwork:
             end_time = elts[0]["timestamp"] + elts[0]["duration"]
     
     def _process_inter_layer(self):
-        all_nodes_infos = [elt for layer in range(self.nb_layers) for elt in self._get_flatten_stream(layer)]
-        all_nodes_infos.sort(key=lambda x: x["timestamp"])
-        nb_notes = len(all_nodes_infos)
+        layer_and_idx = [(layer,idx)for layer in range(self.nb_layers) for idx in range(len(self.parsed_nodes[layer])-self.order+1)]
+        layer_and_idx.sort(key=lambda x: self.parsed_nodes[x[0]][x[1]]["timestamp"])
+        nb_notes = len(layer_and_idx)
         for i in range(nb_notes):
-            timestamp = all_nodes_infos[i]["timestamp"]
-            duration = all_nodes_infos[i]["duration"]
-            layer = all_nodes_infos[i]["layer"]
-            node = self.build_node(all_nodes_infos[i])
+            layer, idx = layer_and_idx[i]
+            nodes_info = self.parsed_nodes[layer][idx:idx + self.order]
+            timestamp = nodes_info[0]["timestamp"]
+            duration = sum([info["duration"] for info in nodes_info])
+            node = self.nodes_lists[layer][idx] if self.order==1 else ",".join(self.nodes_lists[layer][idx:idx+self.order]+self.edges_lists[layer][idx:idx+self.order-1])
             for j in range(i+1,nb_notes):
-                timestamp2 = all_nodes_infos[j]["timestamp"]
+                layer2, idx2 = layer_and_idx[j]
+                nodes_info2 = self.parsed_nodes[layer2][idx2:idx2 + self.order]
+                timestamp2 = nodes_info2[0]["timestamp"]
                 if (self.strict_link and timestamp2 > timestamp) or timestamp2 >= timestamp + duration:
                     break
-                layer2 = all_nodes_infos[j]["layer"]
-                duration2 = all_nodes_infos[j]["duration"]
-
-                node2 = self.build_node(all_nodes_infos[j])
+                duration2 = sum([info["duration"] for info in nodes_info2])
+                node2 = self.nodes_lists[layer2][idx2] if self.order==1 else ",".join(self.nodes_lists[layer2][idx2:idx2+self.order]+self.edges_lists[layer2][idx2:idx2+self.order-1])
                 weight = min(timestamp+duration,timestamp2+duration2)-max(timestamp,timestamp2) if self.duration_weighted_intergraph else 1
                 if layer != layer2:
                     # add undirected edge
@@ -436,13 +440,21 @@ class MultiLayerNetwork:
                     self._add_or_update_edge(node2, node, inter=True, weight=weight)
                 j += 1
 
-    def _add_or_update_node(self, node, node_info, layer, edge_info=None):
+    def _add_or_update_node(self, node, node_info, layer, idx=None, edge_info=None):
         if edge_info is None:
             edge_info = {}
         total_duration = sum([info["duration"] for info in node_info])
         if not self.net.has_node(node):
-            self.net.add_node(node, weight=1, duration_weight=total_duration)
+            self.net.add_node(
+                node, 
+                weight=1, 
+                duration_weight=total_duration, 
+                non_overlapping_weight=1, 
+                non_overlapping_duration_weight=total_duration
+            )
+            if idx is not None: self.last_visit_id[node] = idx
             def add_attribute(param, param_used, elt=None, is_node_info=True):
+                if not is_node_info and self.order==1: return
                 if elt is None:
                     if is_node_info:
                         elt = [info[param] for info in node_info]
@@ -468,6 +480,10 @@ class MultiLayerNetwork:
         else :
             self.net.nodes[node]["weight"] += 1
             self.net.nodes[node]["duration_weight"] += total_duration
+            if idx is not None and (node not in self.last_visit_id or self.last_visit_id[node]+self.order <= idx): # no overlap
+                self.net.nodes[node]["non_overlapping_weight"] += 1
+                self.net.nodes[node]["non_overlapping_duration_weight"] += total_duration
+                self.last_visit_id[node] = idx
             if self.keep_extra:
                 def append_if_list(attribute, elt_to_add=None):
                     if type(self.net.nodes[node][attribute]) == list:
@@ -477,9 +493,6 @@ class MultiLayerNetwork:
                             self.net.nodes[node][attribute].append(elt_to_add)
                 append_if_list("layer")
                 append_if_list("pitch")
-                # append_if_list("pitch_class")
-                # append_if_list("chromatic_interval")
-                # append_if_list("diatonic_interval")
                 append_if_list("duration",float(node_info["duration"]))
                 append_if_list("offset", float(node_info["offset"]))
                 append_if_list("rest")
