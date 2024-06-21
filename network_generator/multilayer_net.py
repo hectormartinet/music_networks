@@ -1,5 +1,6 @@
 import music21 as ms
 import networkx as nx
+import numpy as np
 import parameter_picker as par_pick
 from preset_params import get_preset_params
 from multiprocessing import Pool
@@ -35,15 +36,16 @@ class MultiLayerNetwork:
                 by default is on 'auto' which tries to figure out a name based on midi_file and/or preset parameter
             
             [**kwargs]: all network parameters(all optional with a default value)
-            Node parameters: Booleans to know which values are hold by the nodes.
+            Node attributes: Booleans to know which values are hold by the nodes.
                 - pitch(bool): Pitch of the note disregarding octave. Defaults to True.
                 - octave(bool): Octave of the note. Defaults to False.
                 - duration(bool): Duration of the note in quarter notes. Defaults to False.
                 - offset(bool), offset_period(float): The offset of the note modulo the offset_period. Defaults to False, 1.
-                - chromatic_interval(bool): Chromatic interval with the previous note. Defaults to False.
-                - diatonic_interval(bool): Diatonic interval with the previous note. Defaults to False.
                 - chord_function(bool): Give the corresponding degree of the chord
-
+            Edge attributes: edge type information that will be hold by the nodes for graphs of order 2 or more
+                - chromatic_interval(bool): Chromatic interval between the two notes. Defaults to False.
+                - diatonic_interval(bool): Diatonic interval between the two notes. Defaults to False.
+            
             Edge parameters: To know when two nodes are linked
                 - strict_link(bool): Only link nodes from different layers when the corresponding notes play at the same time \
                     otherwise link nodes if the corresponding note play together at some point. Defaults to False.
@@ -59,7 +61,7 @@ class MultiLayerNetwork:
                 - transpose(bool): Transpose the song in C major/ A minor depending on the mode based on the starting tonality. Defaults to False.
                 - enharmony(bool): Treat equivalent notes (e.g. C# and Db) as the same note. Defaults to True.
                 - group_by_beat(bool): Group the notes of each part by beat and set durations to 1. Defaults to False.
-                - order(int): Number of consecutive notes contained in one node. For example C D E F with order=2 will give the nodes (C,D)->(D,E)->(E,F).
+                - order(int): Number of consecutive notes contained in one node. For example C D E F with order=2 will give the nodes (and edges) : (C,D)->(D,E)->(E,F).
                 
             Input/Output parameters:
                 - midi_files(list[str]): list of midis to use. Convert automatically to a list of size one if the input is not a list.
@@ -212,6 +214,25 @@ class MultiLayerNetwork:
         self.edges_lists = [self._get_edges_list(i) for i in range(self.nb_layers)]
         self.timer.end("parsing notes")
 
+    def duration_to_nice_notation(self, duration, rest=False):
+        def is_int(value, margin=0.01):
+            return abs(round(value)-value) <= margin
+        if duration == 0:
+            assert(not rest)
+            return chr(119188)
+        if not is_int(np.log2(duration)):
+            if not is_int(np.log2(duration/1.5)):
+                return ("r" if rest else "") + str(duration)
+            else:
+                extension = "."
+                value = round(2-np.log2(duration/1.5))
+        else:
+            value = round(2-np.log2(duration))
+            extension = ""
+        if rest:
+            return chr(119099+value) + extension
+        else:
+            return chr(119133+value) + extension
 
     def _parse_params(self, **params):
         self.order = int(params["order"])
@@ -279,6 +300,7 @@ class MultiLayerNetwork:
         infos["rest"] = elt.isRest
         infos["chord"] = elt.isChord
         infos["duration"] = float(elt.duration.quarterLength)
+        infos["duration_nice_notation"] = self.duration_to_nice_notation(infos["duration"], infos["rest"])
         infos["offset"] = float(elt.offset - self.offset_period*math.floor(elt.offset/self.offset_period))
         infos["timestamp"] = float(elt.offset)
         infos["pitch"] = self._parse_pitch(elt, octave=True)
@@ -314,17 +336,21 @@ class MultiLayerNetwork:
     def _get_high_note_pitch(self, elt):
         return ms.pitch.Pitch(elt["pitch"].split(" ")[-1])
 
+    def _get_pitch_list(self, elt):
+        return [ms.pitch.Pitch(pitch) for pitch in elt["pitch"].split(" ")]
+
     def _parse_interval(self, prev_elt=None, next_elt=None):
         elt = {}
         if prev_elt is None or next_elt is None or next_elt["rest"] or prev_elt["rest"]:
             elt["chromatic_interval"] = "N/A"
             elt["diatonic_interval"] = "N/A"
             return elt
-        next_pitch = self._get_high_note_pitch(next_elt)
-        prev_pitch = self._get_high_note_pitch(prev_elt)
-        interval = ms.interval.Interval(prev_pitch, next_pitch)
-        elt["diatonic_interval"] = interval.diatonic.generic.value
-        elt["chromatic_interval"] = interval.chromatic.semitones
+        next_pitches = self._get_pitch_list(next_elt)
+        prev_pitches = self._get_pitch_list(prev_elt)
+        intervals = [ms.interval.Interval(prev_pitches[i], next_pitches[i]) for i in range(min(len(prev_pitches),len(next_pitches)))]
+        # Use all intervals ?? (= remove the [0] from the two next lines)
+        elt["diatonic_interval"] = [interval.diatonic.generic.value for interval in intervals][0]
+        elt["chromatic_interval"] = [interval.chromatic.semitones for interval in intervals][0]
         return elt
 
     def build_node(self, infos):
@@ -471,6 +497,7 @@ class MultiLayerNetwork:
             add_attribute("pitch", self.pitch and self.octave)
             if not self.octave : add_attribute("pitch_class", self.pitch)
             add_attribute("duration", self.duration)
+            add_attribute("duration_nice_notation", self.duration, "".join([info["duration_nice_notation"] for info in node_info]))
             add_attribute("offset", self.offset)
             add_attribute("timestamps", False, [info["timestamp"] for info in node_info])
             add_attribute("rest", self.rest)
