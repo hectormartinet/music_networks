@@ -1,12 +1,12 @@
 import streamlit as st
-from multi_order import SuffixTree
+from multi_order import PrefixTree
 import os
 import numpy as np
 
 def load_tree():
     if st.session_state.tree_name != st.session_state.filename:
         st.session_state.tree_name = st.session_state.filename
-        st.session_state.tree = SuffixTree("trees\\" + st.session_state.filename)
+        st.session_state.tree = PrefixTree("trees\\" + st.session_state.filename)
 
 st.set_page_config(layout="wide")
 
@@ -19,7 +19,7 @@ col1, col2, col3 = st.columns(3)
 if 'words' not in st.session_state:
     st.session_state.words = []
 if 'tree' not in st.session_state:
-    st.session_state.tree = SuffixTree()
+    st.session_state.tree = PrefixTree()
 if 'tree_name' not in st.session_state:
     st.session_state.tree_name = ""
 if 'reset_depth' not in st.session_state:
@@ -84,5 +84,10 @@ else:
             proba = round(value/weight,3)
             proba_txt = str(proba) if proba!=0 else "<0.001"
             st.button(f"{key}: :blue[{proba_txt}]", on_click=add_word, type='secondary')
-    # with col3:
-        # trees = [st.session_state.tree.get_tree(st.session_state.words[])]
+    with col3:
+        st.title("Graphs")
+        trees = [st.session_state.tree.get_tree(st.session_state.words[len(st.session_state.words)-i:], copy_node_lst=False) for i in range(max_depth+1)]
+        entropies = [trees[i].relative_entropy(trees[i+1]) for i in range(len(trees)-1)]
+        st.bar_chart(entropies,)
+        weights = [tree.weight for tree in trees]
+        st.bar_chart(weights)

@@ -2,6 +2,7 @@ from multilayer_net import MultiLayerNetwork
 import os
 import sys
 import random as rd
+import traceback
 
 def rand_bool():
     return bool(rd.randint(0,1))
@@ -14,7 +15,7 @@ def randomize_args():
     args["pitch"] = rand_bool()
     args["duration"] = rand_bool()
     args["offset"] = rand_bool()
-    args["offset_period"] = rd.randint(1,16)/4
+    args["beat_duration"] = rd.randint(1,16)/4
     args["enharmony"] = rand_bool()
     args["transpose"] = rand_bool()
     args["strict_link"] = rand_bool()
@@ -41,11 +42,11 @@ if __name__ == "__main__" :
         args = randomize_args()
         try :
             # Create the MultiLayerNetwork object with the MIDI file and output folder
-            net = MultiLayerNetwork(use_gui=False, midi_folder_or_file=input_file_path, output_folder=output_folder, **args, verbosity=0)
+            net = MultiLayerNetwork(use_gui=False, music_files=input_file_path, output_folder=output_folder, **args, verbosity=0)
             net.create_net()
             net.export_nets(types='all')
         
         except Exception as e:
-            print(e)
+            print(traceback.format_exc())
             print(args)
 

@@ -153,8 +153,11 @@ class PrefixTree:
             nodes.append(self.random_next_node(nodes, alpha))
         return nodes
 
-    def add_nodes(self, nodes_lst, max_order):
-        for i in range(len(nodes_lst)+1):
+    def add_nodes(self, nodes_lst, max_order, edge_mode = False):
+        indices = range(1,len(nodes_lst)+1,2) if edge_mode else range(len(nodes_lst)+1)
+        if edge_mode:
+            max_order = 2*max_order - 1
+        for i in indices:
             self.add_all_prefix_children(nodes_lst[max(0,i-max_order):i], 
                 nodes_lst[i] if i<len(nodes_lst) else "end", i, False)
     
@@ -171,10 +174,13 @@ class PrefixTree:
             new_node = node + "," + subnode
             self.children[new_node] = subchild
 
-    def compute_scores(self, entry_cost=1, word_length_cost=1, sequence_length_cost=1):
+    def compute_scores(self, entry_cost=1, word_length_cost=1, sequence_length_cost=1, edge_mode=False):
         for child in self.children.values():
-            child.compute_scores()
-        self.score = (self.depth-1)*self.effective_weight*sequence_length_cost - entry_cost - self.depth*word_length_cost
+            child.compute_scores(entry_cost, word_length_cost, sequence_length_cost, edge_mode)
+        if edge_mode and self.depth%2==0:
+            self.score = -1000
+        else:
+            self.score = (self.depth-1)*self.effective_weight*sequence_length_cost - entry_cost - self.depth*word_length_cost
 
     def get_best_tree(self):
         best_score = self.score
@@ -254,9 +260,11 @@ class SequenceSimplifier:
             + self.entry_cost*self.alphabet_size() \
             + self.sequence_length_cost * self.sequence_len()
 
-    def best_sequence(self, t, L, base_alphabet_only=False):
+    def best_sequence(self, t, L, base_alphabet_only=False, edge_mode=False):
         tree = PrefixTree()
         if base_alphabet_only:
+            if edge_mode:
+                raise Exception("Edge mode not implemented with base alphabet only")
             sub_seq = []
             for elt in self.sequence:
                 if elt >= self.base_alphabet_size and sub_seq:
@@ -269,13 +277,13 @@ class SequenceSimplifier:
                 tree.reset_last_visit()
                 tree.add_nodes(sub_seq, L)
         else :
-            tree.add_nodes(self.sequence,L)
+            tree.add_nodes(self.sequence, L, edge_mode)
             for node in self.id_to_word.values():
                 if type(node) != tuple: continue
                 tree.reset_last_visit()
-                tree.add_nodes(list(node),L)
+                tree.add_nodes(list(node), L, edge_mode)
         tree.weight_pruning(t=t)
-        tree.compute_scores(self.entry_cost, self.word_length_cost, self.sequence_length_cost)
+        tree.compute_scores(self.entry_cost, self.word_length_cost, self.sequence_length_cost, edge_mode=edge_mode)
         best_tree, score = tree.get_best_tree()
         return tuple(best_tree.rebuild_sequence()), score
 
@@ -373,7 +381,7 @@ if __name__ == "__main__":
 
     t=5
     K=1
-    L=10
+    L=50
     timer = MultiTimer()
 
     # directory = "datasets\\mozart_sonatas\\"
@@ -386,8 +394,8 @@ if __name__ == "__main__":
     # midi_files = ["midis\\schubert_quartet.mid"]
     # output_file = "trees\\bach_invent1_duration_interval.json"
     timer.start("load_midi")
-    net = MultiLayerNetwork(use_gui=False, enharmony=False, pitch=False, structure="multilayer", diatonic_interval=True, duration=True, rest=True, midi_files=midi_files, offset=False, offset_period=1.)
-    net.load_new_midi(midi_files[0])
+    net = MultiLayerNetwork(use_gui=False, enharmony=False, pitch=False, structure="multilayer", diatonic_interval=True, duration=True, rest=True, music_files=midi_files, offset=False, offset_period=1.)
+    net.load_new_file(midi_files[0])
     timer.end("load_midi")
     nodes_lst = net.nodes_lists[0]
     nodes_lst = [json.loads(elt) for elt in nodes_lst]
@@ -405,7 +413,7 @@ if __name__ == "__main__":
     data = [sequence_simplifier.total_score()]
     while True:
         timer.start("computing best sequence")
-        best_seq, score = sequence_simplifier.best_sequence(t, L, base_alphabet_only=False)
+        best_seq, score = sequence_simplifier.best_sequence(t, L, base_alphabet_only=False, edge_mode=True)
         timer.end("computing best sequence")
         if score <= 0: 
             break
@@ -418,7 +426,7 @@ if __name__ == "__main__":
         data.append(sequence_simplifier.total_score())
     # print("\n".join([f"{key}:{value}" for key,value in sequence_simplifier.id_to_word.items()]))
     final_sequence = sequence_simplifier.rebuild_sequence()
-    # print("\n".join([elt_to_str(elt) for elt in final_sequence]))
+    print("\n".join([elt_to_str(elt) for elt in final_sequence]))
     timer.print_times()
     plt.plot(data)
     plt.ylim(0,data[0]*1.05)

@@ -15,12 +15,12 @@ class MultiLayerNetwork:
     # TODO keep documentation up to date
     def __init__(self, use_gui=True, verbosity=1, preset_param=None, name="auto", **kwargs):
         """
-        Class to create a network from midi files
+        Class to create a network from music files (midi, xml, ...)
 
         Args:
-            use_gui (bool, optional) : Launch a small UI to choose the parameters of the network
-            verbosity (int, optional): Amount of information printed when building the network
-            preset_params(str, optional): Use some preset parameters to replicate networks of some papers:
+            - use_gui (bool, optional) : Launch a small UI to choose the parameters of the network
+            - verbosity (int, optional): Amount of information printed when building the network
+            - preset_params(str, optional): Use some preset parameters to replicate networks of some papers:
                 "liu"
                 "ferreti"
                 "gomez"
@@ -32,27 +32,27 @@ class MultiLayerNetwork:
                 "frottier"
                 "mrad_melodic"
                 "mrad_harmonic"
-            name(str, optional): Name of the network. Is used to generate the name of the output files when needed.\
-                by default is on 'auto' which tries to figure out a name based on midi_file and/or preset parameter
+            - name(str, optional): Name of the network. Is used to generate the name of the output files when needed.\
+                by default is on 'auto' which tries to figure out a name based on music_file and/or preset parameter
             
-            [**kwargs]: all network parameters(all optional with a default value)
-            Node attributes: Booleans to know which values are hold by the nodes.
+            -[**kwargs]: all network parameters(all optional with a default value)
+            - Node attributes: Booleans to know which values are hold by the nodes.
                 - pitch(bool): Pitch of the note disregarding octave. Defaults to True.
                 - octave(bool): Octave of the note. Defaults to False.
                 - duration(bool): Duration of the note in quarter notes. Defaults to False.
-                - offset(bool), offset_period(float): The offset of the note modulo the offset_period. Defaults to False, 1.
+                - offset(bool): The offset of the note modulo the beat_duration (float parameter). Defaults to False, 1.
                 - chord_function(bool): Give the corresponding degree of the chord
-            Edge attributes: edge type information that will be hold by the nodes for graphs of order 2 or more
-                - chromatic_interval(bool): Chromatic interval between the two notes. Defaults to False.
-                - diatonic_interval(bool): Diatonic interval between the two notes. Defaults to False.
+            - Edge attributes: edge type information that will be hold by the nodes for graphs of order 2 or more
+                - chromatic_interval(bool): Chromatic interval between two consecutive notes. Defaults to False.
+                - diatonic_interval(bool): Diatonic interval between two consecutive notes. Defaults to False.
             
-            Edge parameters: To know when two nodes are linked
+            - Edge parameters: To know when two nodes are linked
                 - strict_link(bool): Only link nodes from different layers when the corresponding notes play at the same time \
                     otherwise link nodes if the corresponding note play together at some point. Defaults to False.
                 - max_link_time_diff(float): Maximal time difference in quarter notes between two consecutive notes \
                     (i.e. just separated by rests) for them to be linked. Defaults to 4.
 
-            General structure parameters: Describe the general behaviour of the network
+            - General structure parameters: Describe the general behaviour of the network
                 - structure(str): Gives the struture of the outputed net. If the song has only one part, this parameter does not matter \
                     Here is each value possible for this parameter:
                     - 'multilayer': Process each part separately and output a net with as much layers as they are parts in the input file.
@@ -60,11 +60,14 @@ class MultiLayerNetwork:
                     - 'chordify': Flatten all the parts into one part
                 - transpose(bool): Transpose the song in C major/ A minor depending on the mode based on the starting tonality. Defaults to False.
                 - enharmony(bool): Treat equivalent notes (e.g. C# and Db) as the same note. Defaults to True.
-                - group_by_beat(bool): Group the notes of each part by beat and set durations to 1. Defaults to False.
+                - chordify_by_beat(bool): For each beat, regroup all the notes of every part and replace it by a chord with the same notes (and a duration of 1). Defaults to False.
                 - order(int): Number of consecutive notes contained in one node. For example C D E F with order=2 will give the nodes (and edges) : (C,D)->(D,E)->(E,F).
-                
-            Input/Output parameters:
-                - midi_files(list[str]): list of midis to use. Convert automatically to a list of size one if the input is not a list.
+                - group_by_beat(bool): For each part, group the notes per beat. TODO detail
+                - beat_duration(float): Duration of a beat in quarter notes. Used for the parameters offset, chordify_by_beat, group_by_beat.\
+                    Should be set at any meaningful duration unit of the song. e.g. in 6/8 signature, 0.5, 1.5 and 3 are good, whereas in 4/4, you might want to set it to 1,2 or 4.
+
+            - Input/Output parameters:
+                - music_files(list[str]): list of files to use. Convert automatically to a list of size one if the input is not a list.
                 - outfolder(str): Output folder for all the graphs.
         """
         # Default Parameters
@@ -74,7 +77,7 @@ class MultiLayerNetwork:
             "duration":False,
             "rest":False,
             "offset":False,
-            "offset_period":1.,
+            "beat_duration":1.,
             "enharmony":True,
             "diatonic_interval":False,
             "chromatic_interval":False,
@@ -84,16 +87,17 @@ class MultiLayerNetwork:
             "order":1,
             "strict_link":False,
             "max_link_time_diff":4.,
+            "chordify_by_beat":False,
             "group_by_beat":False,
             "split_chords":False,
             "duration_weighted_intergraph":True,
             "analyze_key":False,
             "keep_extra":False,
-            "midi_files":["midis/invent_bach/invent1.mid"],
+            "music_files":["midis/invent_bach/invent1.mid"],
             "outfolder":"results"
         }
-        if kwargs["midi_files"] is not None and type(kwargs["midi_files"]) != list:
-            kwargs["midi_files"] = [kwargs["midi_files"]]
+        if kwargs["music_files"] is not None and type(kwargs["music_files"]) != list:
+            kwargs["music_files"] = [kwargs["music_files"]]
         if preset_param is not None:
             self._overwrite_params(params, **get_preset_params(preset_param))
         self._overwrite_params(params, **kwargs)
@@ -109,14 +113,14 @@ class MultiLayerNetwork:
         """NetworkX: Current working net"""
 
         self.separated_nets = {}
-        """dict{str:NetworkX}: All networks generated from each midi file by name"""
+        """dict{str:NetworkX}: All networks generated from each file by name"""
 
         self.separated_sub_nets = {}
 
         self.separated_intergraphs = {}
 
         self.aggregated_net = nx.DiGraph()
-        """NetworkX: Aggregated network from every midi file"""
+        """NetworkX: Aggregated network from every file"""
 
         self.aggregated_sub_nets = []
         self.aggregated_intergraph = None
@@ -132,8 +136,8 @@ class MultiLayerNetwork:
 
     def _auto_name(self, preset_param=None):
         name = ""
-        if len(self.midi_files) == 1:
-            name += os.path.splitext(os.path.basename(self.midi_files[0]))[0]
+        if len(self.music_files) == 1:
+            name += os.path.splitext(os.path.basename(self.music_files[0]))[0]
         if preset_param is not None:
             if name != "": name += "_"
             name += preset_param
@@ -158,8 +162,11 @@ class MultiLayerNetwork:
             assert(False)
         return part.transpose(i), new_key
 
-    def load_whole_piece(midifilename, analyze_key=False, chordify=False, transpose=False):
-        whole_piece = ms.converter.parse(midifilename, quarterLengthDivisors = (16,))
+    def load_whole_piece(file_name, analyze_key=False, chordify=False, transpose=False):
+        """
+            Parse a song and do all 
+        """
+        whole_piece = ms.converter.parse(file_name, quarterLengthDivisors = (16,))
         original_key = None
         if analyze_key:
             original_key = whole_piece.flatten().analyze('key')
@@ -185,18 +192,18 @@ class MultiLayerNetwork:
         return par_pick.get_parameters(params)
         
 
-    def load_new_midi(self, midifilename, whole_piece=None, key=None, original_key=None):
+    def load_new_file(self, file_name, whole_piece=None, key=None, original_key=None):
         self.stream_list = []
         self.parsed_nodes = []
         self.instruments = []
         self.original_key = original_key
         self.key = key
-        self.midi_file = midifilename
-        self._print_if_useful("Loading new midi : " + midifilename, 2)
+        self.music_file = file_name
+        self._print_if_useful("Loading new file : " + file_name, 2)
         if whole_piece is None:
-            self.timer.start("load midi")
-            whole_piece, self.key, self.original_key = MultiLayerNetwork.load_whole_piece(self.midi_file, self.analyze_key, self.chordify, self.transpose)
-            self.timer.end("load midi")
+            self.timer.start("load file")
+            whole_piece, self.key, self.original_key = MultiLayerNetwork.load_whole_piece(self.music_file, self.analyze_key, self.chordify, self.transpose)
+            self.timer.end("load file")
         self.timer.start("parsing notes")
         if self.chordify:
             self.stream_list.append(whole_piece)
@@ -206,8 +213,8 @@ class MultiLayerNetwork:
             for elt in whole_piece.recurse():
                 if 'Instrument' in elt.classes:
                     self.instruments.append(str(elt))
-        if self.group_by_beat:
-            self.group_notes_by_beat()
+        if self.chordify_by_beat:
+            self.chordify_notes_by_beat()
         self.parsed_nodes = [self._build_parsed_list(part, i) for i,part in enumerate(self.stream_list)]
         self.parsed_edges = [self._build_edges_list(parsed_nodes,i) for i,parsed_nodes in enumerate(self.parsed_nodes)]
         self.nodes_lists = [self._get_nodes_list(i) for i in range(self.nb_layers)]
@@ -243,8 +250,8 @@ class MultiLayerNetwork:
         self.enharmony = params["enharmony"]
         self.duration = params["duration"]
         self.offset = params["offset"]
-        self.offset_period = params["offset_period"]
-        assert(self.offset_period > 0)
+        self.beat_duration = params["beat_duration"]
+        assert(self.beat_duration > 0)
         self.transpose = params["transpose"]
         self.strict_link = params["strict_link"]
         self.max_link_time_diff = params["max_link_time_diff"]
@@ -252,15 +259,16 @@ class MultiLayerNetwork:
         self.diatonic_interval = params["diatonic_interval"] and not self.enharmony
         self.chromatic_interval = params["chromatic_interval"]
         self.chord_function = params["chord_function"]
+        self.chordify_by_beat = params["chordify_by_beat"]
         self.group_by_beat = params["group_by_beat"]
-        self.midi_files = params["midi_files"]
-        if type(self.midi_files) != list:
-            self.midi_files = [self.midi_files]
+        self.music_files = params["music_files"]
+        if type(self.music_files) != list:
+            self.music_files = [self.music_files]
         self.duration_weighted_intergraph = params["duration_weighted_intergraph"]
         self.keep_extra = params["keep_extra"] and self.order == 1
         self.split_chords = params["split_chords"] and self.order == 1
         self.analyze_key = params["analyze_key"] or self.transpose or self.chord_function
-        for file_name in self.midi_files:
+        for file_name in self.music_files:
             if not os.path.splitext(file_name)[1] in [".mid", ".musicxml", ".mxl", ".xml"]:
                 raise Exception(f"{os.path.splitext(file_name)[1]} is not a correct file format")
         self.outfolder = params["outfolder"]
@@ -280,7 +288,7 @@ class MultiLayerNetwork:
     def multilayer(self): return self.structure == "multilayer" and self.nb_layers > 1
 
     @property
-    def interlayering(self): return self.multilayer
+    def interlayering(self): return self.multilayer and not self.group_by_beat and not self.split_chords
 
     def _is_ignored(self, elt):
         if not self.rest and elt.isRest:
@@ -301,7 +309,7 @@ class MultiLayerNetwork:
         infos["chord"] = elt.isChord
         infos["duration"] = float(elt.duration.quarterLength)
         infos["duration_nice_notation"] = self.duration_to_nice_notation(infos["duration"], infos["rest"])
-        infos["offset"] = float(elt.offset - self.offset_period*math.floor(elt.offset/self.offset_period))
+        infos["offset"] = float(elt.offset % self.beat_duration)
         infos["timestamp"] = float(elt.offset)
         infos["pitch"] = self._parse_pitch(elt, octave=True)
         infos["pitch_class"] = self._parse_pitch(elt, octave=False)
@@ -414,6 +422,7 @@ class MultiLayerNetwork:
     def _process_intra_layer(self, layer, prev_node=None, end_time=None):
         self.last_visit_id = {}
         if self.split_chords: return self._process_intra_layer_splited(layer, prev_node, end_time)
+        if self.group_by_beat: return self._process_intra_layer_grouped(layer, prev_node)
         for i in range(len(self.parsed_nodes[layer])+1-self.order):
             node_info = self.parsed_nodes[layer][i:i+self.order]
             edge_info = self.parsed_edges[layer][i:i+self.order-1]
@@ -425,6 +434,25 @@ class MultiLayerNetwork:
                         self._add_or_update_edge(prev_node, node, inter=False)
             prev_node = node
             end_time = node_info[-1]["timestamp"] + node_info[-1]["duration"]
+    
+    def _process_intra_layer_grouped(self, layer, prev_node=None):
+        time = math.floor(self.parsed_nodes[layer][0]["timestamp"])
+        start_idx = 0
+        while start_idx < len(self.parsed_nodes[layer]):
+            end_idx = start_idx
+            while end_idx < len(self.parsed_nodes[layer]) and self.parsed_nodes[layer][end_idx]["timestamp"] < time+self.beat_duration:
+                end_idx += 1
+            node_info = self.parsed_nodes[layer][start_idx:end_idx]
+            edge_info = self.parsed_edges[layer][start_idx:end_idx-1]
+            node = ",".join(self.nodes_lists[layer][start_idx:end_idx]+self.edges_lists[layer][start_idx:end_idx-1])
+            if node=="":
+                node = "empty"
+            self._add_or_update_node(node, node_info, layer, edge_info=edge_info)
+            if prev_node is not None:
+                self._add_or_update_edge(prev_node, node, inter=False)
+            prev_node = node
+            start_idx = end_idx
+            time += self.beat_duration
 
     def _process_intra_layer_splited(self, layer, prev_nodes=None, end_time=None):
         assert(self.order == 1)
@@ -469,7 +497,7 @@ class MultiLayerNetwork:
     def _add_or_update_node(self, node, node_info, layer, idx=None, edge_info=None):
         if edge_info is None:
             edge_info = {}
-        total_duration = sum([info["duration"] for info in node_info])
+        total_duration = float(sum([info["duration"] for info in node_info]))
         if not self.net.has_node(node):
             self.net.add_node(
                 node, 
@@ -480,13 +508,13 @@ class MultiLayerNetwork:
             )
             if idx is not None: self.last_visit_id[node] = idx
             def add_attribute(param, param_used, elt=None, is_node_info=True):
-                if not is_node_info and self.order==1: return
+                if not is_node_info and self.order==1 and not self.group_by_beat: return
                 if elt is None:
                     if is_node_info:
                         elt = [info[param] for info in node_info]
                     else:
                         elt = [info[param] for info in edge_info]
-                if type(elt)==list and len(elt) == 1:
+                if type(elt)==list and len(elt)==1 and not self.group_by_beat:
                     elt = elt[0]
                 if param_used:
                     self.net.nodes[node][param] = elt
@@ -507,7 +535,7 @@ class MultiLayerNetwork:
         else :
             self.net.nodes[node]["weight"] += 1
             self.net.nodes[node]["duration_weight"] += total_duration
-            if idx is not None and (node not in self.last_visit_id or self.last_visit_id[node]+self.order <= idx): # no overlap
+            if idx is None or (node not in self.last_visit_id or self.last_visit_id[node]+self.order <= idx): # no overlap condition
                 self.net.nodes[node]["non_overlapping_weight"] += 1
                 self.net.nodes[node]["non_overlapping_duration_weight"] += total_duration
                 self.last_visit_id[node] = idx
@@ -537,7 +565,7 @@ class MultiLayerNetwork:
         """
         Necessary step before exporting graph.
         """
-        if not self.keep_extra and self.order==1 :return
+        if not self.keep_extra and not self.group_by_beat and self.order==1 :return
         for node in net.nodes:
             for attribute in net.nodes[node].keys():
                 if type(net.nodes[node][attribute]) == list :
@@ -582,10 +610,10 @@ class MultiLayerNetwork:
         cur_out = filepath + "_intergraph.graphml"
         nx.write_graphml(intergraph, cur_out)
 
-    def _process_net(self, midi_file_path, separate_graphs, output_txt, whole_piece=None, key=None, original_key=None):
-        self.load_new_midi(midi_file_path, whole_piece, key, original_key)
+    def _process_net(self, file_path, separate_graphs, output_txt, whole_piece=None, key=None, original_key=None):
+        self.load_new_file(file_path, whole_piece, key, original_key)
         self._stream_to_network()
-        name = os.path.splitext(os.path.basename(midi_file_path))[0]
+        name = os.path.splitext(os.path.basename(file_path))[0]
         if output_txt:
             for i in range(self.nb_layers):
                 self.export_nodes_list(filename=name, layer=i)
@@ -597,33 +625,33 @@ class MultiLayerNetwork:
     def create_net(self, separate_graphs=False, output_txt=True, parallel=False, pool_size=100):
         """Create the main network
             Args:
-                - separate_graphs(bool): If set to True, create a net for every midi file, else create only one net where everything is aggregated
+                - separate_graphs(bool): If set to True, create a net for every music file, else create only one net where everything is aggregated
                 - output_txt(bool): If set to True, output the nodes played in order for each layer of each net
-                - parallel(bool): If set to True, load the different midis in parallel. Recommended only for big files as it could slow down the process for smaller ones.
+                - parallel(bool): If set to True, load the different files in parallel. Recommended only for big files as it could slow down the process for smaller ones.
                 - pool_size(int): Number of files loaded at the same time. Is ignored if parallel is False.
         """
-        nb_files = len(self.midi_files)
+        nb_files = len(self.music_files)
         if nb_files <= 1: separate_graphs = False
 
-        self._print_if_useful("[+] Converting " + str(nb_files) + " MIDI file(s) to network", 1)
+        self._print_if_useful("[+] Converting " + str(nb_files) + " file(s) to network", 1)
         pbar = tqdm(total=nb_files)
         self.net = nx.DiGraph()
         self.separated_nets = {}
         if parallel:
-            for pool_idx in range(math.ceil(len(self.midi_files)/pool_size)):
+            for pool_idx in range(math.ceil(len(self.music_files)/pool_size)):
                 low_idx = pool_idx*pool_size
-                high_idx = min((pool_idx+1)*pool_size, len(self.midi_files))
-                pool_input = [(file, self.analyze_key, self.chordify, self.transpose) for file in self.midi_files[low_idx:high_idx]]
-                self.timer.start("load midi")
+                high_idx = min((pool_idx+1)*pool_size, len(self.music_files))
+                pool_input = [(file, self.analyze_key, self.chordify, self.transpose) for file in self.music_files[low_idx:high_idx]]
+                self.timer.start("load file")
                 with Pool() as p:
                     parsed_pieces = p.starmap(MultiLayerNetwork.load_whole_piece, pool_input)
-                self.timer.end("load midi")
-                for piece, midi_file_path in zip(parsed_pieces, self.midi_files[low_idx:high_idx]):
-                    self._process_net(midi_file_path, separate_graphs, output_txt, piece[0], piece[1], piece[2])
+                self.timer.end("load file")
+                for piece, file_path in zip(parsed_pieces, self.music_files[low_idx:high_idx]):
+                    self._process_net(file_path, separate_graphs, output_txt, piece[0], piece[1], piece[2])
                     pbar.update(1)
         else:
-            for midi_file_path in self.midi_files:
-                self._process_net(midi_file_path, separate_graphs, output_txt)
+            for file_path in self.music_files:
+                self._process_net(file_path, separate_graphs, output_txt)
                 pbar.update(1)
                 if separate_graphs:
                     self.net = nx.DiGraph()
@@ -716,22 +744,26 @@ class MultiLayerNetwork:
     def list_to_string(self,my_list):
         return ','.join(str(x) for x in my_list)
     
-    def group_notes_by_beat(self):
+    def chordify_notes_by_beat(self):
         stream_list_copy, self.stream_list = self.stream_list, []
         for stream in stream_list_copy:
             notes_and_rests = stream.flatten().notesAndRests
             new_stream = ms.stream.Stream()
-            idx = 0
-            first_beat = math.floor(notes_and_rests[0].offset)
+            starting_idx = 0
+            first_timestamp = math.floor(notes_and_rests[0].offset)
             if len(notes_and_rests) == 0: continue
-            last_beat = math.floor(max([elt.offset + elt.quarterLength for elt in notes_and_rests]))
+            last_timestamp = math.floor(max([elt.offset + elt.quarterLength for elt in notes_and_rests]))
             elts_in_beat = []
             loop = True
-            for current_beat in range(first_beat, last_beat):
-                elts_in_beat = [elt for elt in elts_in_beat if elt.offset + elt.quarterLength > current_beat]
-                for i in range(idx, len(notes_and_rests)):
-                    if notes_and_rests[i].offset >= current_beat + 1:
-                        idx = i
+            current_timestamp = first_timestamp
+            while current_timestamp < last_timestamp:
+                print(current_timestamp)
+                # Get elements from last beat that are still playing in the current one
+                elts_in_beat = [elt for elt in elts_in_beat if elt.offset + elt.quarterLength > current_timestamp]
+                # Add elements which starts in the current beat
+                for i in range(starting_idx, len(notes_and_rests)):
+                    if notes_and_rests[i].offset >= current_timestamp + self.beat_duration:
+                        starting_idx = i
                         break
                     elts_in_beat.append(notes_and_rests[i])
                 pitches_in_beat = [pitch for note in elts_in_beat if not note.isRest for pitch in note.pitches]
@@ -739,9 +771,9 @@ class MultiLayerNetwork:
                     new_note = ms.chord.Chord(pitches_in_beat)
                 else:
                     new_note = ms.note.Rest()
-                new_note.offset = current_beat
+                new_note.offset = current_timestamp
                 new_stream.append(new_note)
-                current_beat += 1
+                current_timestamp += self.beat_duration
             self.stream_list.append(new_stream)
 
     def export_nets(self, types=["main_net","sub_net"]):
@@ -786,11 +818,11 @@ class MultiLayerNetwork:
 if __name__ == "__main__" :
 
     directory = "midis\\invent_bach\\"
-    midi_files = [directory + f for f in os.listdir(directory)]
+    music_files = [directory + f for f in os.listdir(directory)]
     output_folder = 'results'  # Replace with your desired output folder
     
     # Create the MultiLayerNetwork object with the MIDI file and output folder
-    net = MultiLayerNetwork(use_gui=True, outfolder=output_folder, midi_files=midi_files, preset_param="liu")
+    net = MultiLayerNetwork(use_gui=True, outfolder=output_folder, music_files=music_files, preset_param="liu")
 
     # Build net
     net.create_net(separate_graphs=True, output_txt=True, parallel=False)

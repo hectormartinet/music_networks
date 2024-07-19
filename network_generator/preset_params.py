@@ -29,7 +29,7 @@ gomez_params = {
 # Missing timbre and loudness
 serra_params = {
     "pitch":True,
-    "group_by_beat":True,
+    "chordify_by_beat":True,
     "flatten":True,
     "enharmony":True
 }

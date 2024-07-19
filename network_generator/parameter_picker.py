@@ -112,7 +112,7 @@ def get_parameters(default_params):
         "pitch":"checkbox",
         "duration":"checkbox",
         "offset":"checkbox",
-        "offset_period":"number_picker",
+        "beat_duration":"number_picker",
         "transpose":"checkbox",
         "strict_link":"checkbox",
         "max_link_time_diff":"number_picker",
@@ -121,12 +121,13 @@ def get_parameters(default_params):
         "diatonic_interval":"checkbox",
         "chromatic_interval":"checkbox",
         "chord_function":"checkbox",
+        "chordify_by_beat":"checkbox",
         "group_by_beat":"checkbox",
         "split_chords":"checkbox",
         "duration_weighted_intergraph":"checkbox",
         "analyze_key":"checkbox",
         "keep_extra":"checkbox",
-        "midi_files":"file_picker",
+        "music_files":"file_picker",
         "outfolder":"folder_picker"
     }
 
@@ -138,7 +139,6 @@ def get_parameters(default_params):
     # Some parameters are only usefull when an other has a specific value
     dependancy = {
         "pitch": [("octave",True),("enharmony",True)],
-        "offset": [("offset_period", True)],
         "enharmony":[("diatonic_interval", False)]
     }
     app = wx.App(0)

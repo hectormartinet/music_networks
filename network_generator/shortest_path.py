@@ -8,8 +8,7 @@ import numpy as np
 if __name__ == "__main__":
 
     # Parameters
-    C = 5
-    entry_cost_function = lambda x:x+1
+    entry_cost_function = lambda x:5*x+5
     L = 10
     t = 5
 
@@ -17,8 +16,8 @@ if __name__ == "__main__":
     # midi_file = "midis\\invent_bach\\invent14.mid"
     midi_file = "datasets\\mozart_sonatas\\K545-3.xml"
     # midi_file = "datasets\\mozart_sonatas\\K331-1.xml"
-    net = MultiLayerNetwork(use_gui=False, enharmony=False, pitch=False, structure="monolayer", diatonic_interval=True, duration=True, rest=True, midi_files=[midi_file], offset=False, offset_period=1.)
-    net.load_new_midi(midi_file)
+    net = MultiLayerNetwork(use_gui=False, enharmony=False, pitch=False, structure="monolayer", diatonic_interval=True, duration=True, rest=True, music_files=[midi_file], offset=False, offset_period=1.)
+    net.load_new_file(midi_file)
     nodes_lst = net._get_nodes_list(0)
     nodes_lst = [json.loads(elt) for elt in nodes_lst]
     nodes_lst = [duration_to_note(elt["duration"],elt["rest"]) for elt in nodes_lst]

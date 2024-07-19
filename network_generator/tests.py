@@ -40,7 +40,7 @@ class MultilayerNetworkTester:
         tests = [
             self.test_enharmony,
             self.test_chord_function,
-            self.test_group_by_beat,
+            self.test_chordify_by_beat,
             self.test_pitch,
             self.test_octave,
             self.test_duration,
@@ -58,7 +58,8 @@ class MultilayerNetworkTester:
             self.test_diatonic_interval,
             self.test_duration_weighted_intergraph,
             self.test_order,
-            self.test_duration_weighted
+            self.test_duration_weighted,
+            self.test_group_by_beat
         ]
         nb_test_failed = 0
         for test in tests:
@@ -114,7 +115,7 @@ class MultilayerNetworkTester:
         self.current_test = "enharmony(True)"
         
         # Create net
-        net = MultiLayerNetwork(use_gui=False, verbosity=0, midi_files=file_path, enharmony=True)
+        net = MultiLayerNetwork(use_gui=False, verbosity=0, music_files=file_path, enharmony=True)
         net.create_net(output_txt=False)
         graph = net.get_net()
 
@@ -130,7 +131,7 @@ class MultilayerNetworkTester:
         self.current_test = "enharmony(False)"
 
         # Create net
-        net = MultiLayerNetwork(use_gui=False, verbosity=0, midi_files=file_path, enharmony=False)
+        net = MultiLayerNetwork(use_gui=False, verbosity=0, music_files=file_path, enharmony=False)
         net.create_net(output_txt=False)
         graph = net.get_net()
 
@@ -164,7 +165,7 @@ class MultilayerNetworkTester:
         stream.write("midi",file_path)
 
         # Create net
-        net = MultiLayerNetwork(use_gui=False, verbosity=0, midi_files=file_path, pitch=False, chord_function=True)
+        net = MultiLayerNetwork(use_gui=False, verbosity=0, music_files=file_path, pitch=False, chord_function=True)
         net.create_net(output_txt=False)
         graph = net.get_net()
 
@@ -178,13 +179,13 @@ class MultilayerNetworkTester:
         exp_graph.add_edge(node2, node1, weight=1)
         self.assert_graph_match(graph, exp_graph)
     
-    def test_group_by_beat(self):
+    def test_chordify_by_beat(self):
         """
-        Test group_by_beat parameter:
+        Test chordify_by_beat parameter:
             - Notes from the same beat should end up in the same chord
             - Within a beat, different order of notes should give the same node
         """
-        self.current_test = "group_by_beat"
+        self.current_test = "chordify_by_beat"
 
         # Create midi file
         stream = ms.converter.parse("tinyNotation: c8 d8 e4 d8 c8")
@@ -192,7 +193,7 @@ class MultilayerNetworkTester:
         stream.write("midi", file_path)
 
         # Create net
-        net = MultiLayerNetwork(use_gui=False, verbosity=0, midi_files=file_path, group_by_beat=True)
+        net = MultiLayerNetwork(use_gui=False, verbosity=0, music_files=file_path, chordify_by_beat=True)
         net.create_net(output_txt=False)
         graph = net.get_net()
 
@@ -221,7 +222,7 @@ class MultilayerNetworkTester:
         stream.write("midi", file_path)
 
         # Create net
-        net = MultiLayerNetwork(use_gui=False, verbosity=0, midi_files=file_path)
+        net = MultiLayerNetwork(use_gui=False, verbosity=0, music_files=file_path)
         net.create_net(output_txt=False)
         graph = net.get_net()
 
@@ -251,7 +252,7 @@ class MultilayerNetworkTester:
         stream.write("midi", file_path)
 
         # Create net
-        net = MultiLayerNetwork(use_gui=False, verbosity=0, midi_files=file_path, octave=True)
+        net = MultiLayerNetwork(use_gui=False, verbosity=0, music_files=file_path, octave=True)
         net.create_net(output_txt=False)
         graph = net.get_net()
 
@@ -281,7 +282,7 @@ class MultilayerNetworkTester:
         stream.write("midi", file_path)
 
         # Create net
-        net = MultiLayerNetwork(use_gui=False, verbosity=0, midi_files=file_path, duration=True, pitch=False)
+        net = MultiLayerNetwork(use_gui=False, verbosity=0, music_files=file_path, duration=True, pitch=False)
         net.create_net(output_txt=False)
         graph = net.get_net()
 
@@ -313,7 +314,7 @@ class MultilayerNetworkTester:
         self.current_test = "rest(True)"
 
         # Create net
-        net = MultiLayerNetwork(use_gui=False, verbosity=0, midi_files=file_path, rest=True)
+        net = MultiLayerNetwork(use_gui=False, verbosity=0, music_files=file_path, rest=True)
         net.create_net(output_txt=False)
         graph = net.get_net()
         
@@ -333,7 +334,7 @@ class MultilayerNetworkTester:
         self.current_test = "rest(False)"
 
         # Create net
-        net = MultiLayerNetwork(use_gui=False, verbosity=0, midi_files=file_path, rest=False)
+        net = MultiLayerNetwork(use_gui=False, verbosity=0, music_files=file_path, rest=False)
         net.create_net(output_txt=False)
         graph = net.get_net()
         
@@ -358,7 +359,7 @@ class MultilayerNetworkTester:
         stream.write("midi", file_path)
 
         # Create net
-        net = MultiLayerNetwork(use_gui=False, verbosity=0, midi_files=file_path, offset=True, offset_period=1)
+        net = MultiLayerNetwork(use_gui=False, verbosity=0, music_files=file_path, offset=True, offset_period=1)
         net.create_net(output_txt=False)
         graph = net.get_net()
 
@@ -403,7 +404,7 @@ class MultilayerNetworkTester:
         stream.write("midi", file_path)
 
         # Create net
-        net = MultiLayerNetwork(use_gui=False, verbosity=0, midi_files=file_path, transpose=True)
+        net = MultiLayerNetwork(use_gui=False, verbosity=0, music_files=file_path, transpose=True)
         net.create_net(output_txt=False)
         if net.original_key != ms.key.Key("G",mode="major"):
             raise Exception(f"Key analysis failed, expected tonality : G major, found : {net.original_key}")
@@ -441,7 +442,7 @@ class MultilayerNetworkTester:
         stream.write("midi", file_path)
 
         # Create net
-        net = MultiLayerNetwork(use_gui=False, verbosity=0, midi_files=file_path, structure="multilayer", duration_weighted_intergraph=False, strict_link=True)
+        net = MultiLayerNetwork(use_gui=False, verbosity=0, music_files=file_path, structure="multilayer", duration_weighted_intergraph=False, strict_link=True)
         net.create_net(output_txt=False)
         graph = net._get_intergraph(net.net)
 
@@ -487,7 +488,7 @@ class MultilayerNetworkTester:
         stream.write("midi", file_path)
 
         # Create net
-        net = MultiLayerNetwork(use_gui=False, verbosity=0, midi_files=file_path, max_link_time_diff=2)
+        net = MultiLayerNetwork(use_gui=False, verbosity=0, music_files=file_path, max_link_time_diff=2)
         net.create_net(output_txt=False)
         graph = net.get_net()
 
@@ -518,7 +519,7 @@ class MultilayerNetworkTester:
         stream.write("midi", file_path)
 
         # Create net
-        net = MultiLayerNetwork(use_gui=False, verbosity=0, midi_files=file_path, structure="multilayer", duration_weighted_intergraph = False)
+        net = MultiLayerNetwork(use_gui=False, verbosity=0, music_files=file_path, structure="multilayer", duration_weighted_intergraph = False)
         net.create_net(output_txt=False)
         graph = net._get_intergraph(net.net)
 
@@ -569,7 +570,7 @@ class MultilayerNetworkTester:
         stream.write("midi", file_path)
 
         # Create net
-        net = MultiLayerNetwork(use_gui=False, verbosity=0, midi_files=file_path, structure="monolayer")
+        net = MultiLayerNetwork(use_gui=False, verbosity=0, music_files=file_path, structure="monolayer")
         net.create_net(output_txt=False)
         graph = net.get_net()
 
@@ -602,7 +603,7 @@ class MultilayerNetworkTester:
         stream.write("midi", file_path)
 
         # Create net
-        net = MultiLayerNetwork(use_gui=False, verbosity=0, midi_files=file_path, structure="chordify", duration=True)
+        net = MultiLayerNetwork(use_gui=False, verbosity=0, music_files=file_path, structure="chordify", duration=True)
         net.create_net(output_txt=False)
         graph = net.get_net()
 
@@ -641,7 +642,7 @@ class MultilayerNetworkTester:
         stream.write("musicxml", file_path)
 
         # Create net
-        net = MultiLayerNetwork(use_gui=False, verbosity=0, midi_files=file_path, diatonic_interval=True, enharmony=False, pitch=False, order=2)
+        net = MultiLayerNetwork(use_gui=False, verbosity=0, music_files=file_path, diatonic_interval=True, enharmony=False, pitch=False, order=2)
         net.create_net(output_txt=False)
         graph = net.get_net()
 
@@ -663,7 +664,7 @@ class MultilayerNetworkTester:
         stream.write("midi", file_path)
 
         # Create net
-        net = MultiLayerNetwork(use_gui=False, verbosity=0, midi_files=file_path, chromatic_interval=True, order=2, pitch=False)
+        net = MultiLayerNetwork(use_gui=False, verbosity=0, music_files=file_path, chromatic_interval=True, order=2, pitch=False)
         net.create_net(output_txt=False)
         graph = net.get_net()
 
@@ -694,7 +695,7 @@ class MultilayerNetworkTester:
         stream.write("midi", file_path)
 
         # Create net
-        net = MultiLayerNetwork(use_gui=False, verbosity=0, midi_files=file_path, split_chords=True)
+        net = MultiLayerNetwork(use_gui=False, verbosity=0, music_files=file_path, split_chords=True)
         net.create_net(output_txt=False)
         graph = net.get_net()
 
@@ -735,7 +736,7 @@ class MultilayerNetworkTester:
         stream.write("midi", file_path)
 
         # Create net
-        net = MultiLayerNetwork(use_gui=False, verbosity=0, midi_files=file_path, structure="multilayer", duration_weighted_intergraph=True)
+        net = MultiLayerNetwork(use_gui=False, verbosity=0, music_files=file_path, structure="multilayer", duration_weighted_intergraph=True)
         net.create_net(output_txt=False)
         graph = net._get_intergraph(net.net)
 
@@ -785,7 +786,7 @@ class MultilayerNetworkTester:
         self.current_test = "analyze_key(False)"
         
         # Create net
-        net = MultiLayerNetwork(use_gui=False, verbosity=0, midi_files=file_path, analyze_key=False)
+        net = MultiLayerNetwork(use_gui=False, verbosity=0, music_files=file_path, analyze_key=False)
         net.create_net(output_txt=False)
         if net.original_key is not None:
             raise Exception("analyze_key=False, but the analysis has been done")
@@ -794,7 +795,7 @@ class MultilayerNetworkTester:
         self.current_test = "analyze_key(True)"
 
         # Create net
-        net = MultiLayerNetwork(use_gui=False, verbosity=0, midi_files=file_path, analyze_key=True)
+        net = MultiLayerNetwork(use_gui=False, verbosity=0, music_files=file_path, analyze_key=True)
         net.create_net(output_txt=False)
         if net.original_key is None:
             raise Exception("analyze_key=True, but the analysis has not been done")
@@ -808,7 +809,7 @@ class MultilayerNetworkTester:
         stream.write("midi", file_path)
 
         # Create net
-        net = MultiLayerNetwork(use_gui=False, verbosity=0, midi_files=file_path, order=2)
+        net = MultiLayerNetwork(use_gui=False, verbosity=0, music_files=file_path, order=2)
         net.create_net(output_txt=False)
         graph = net.get_net()
 
@@ -841,7 +842,7 @@ class MultilayerNetworkTester:
         stream.write("midi", file_path)
 
         # Create net
-        net = MultiLayerNetwork(use_gui=False, verbosity=0, midi_files=file_path, pitch=True)
+        net = MultiLayerNetwork(use_gui=False, verbosity=0, music_files=file_path, pitch=True)
         net.create_net(output_txt=False)
         graph = net.get_net()
 
@@ -854,6 +855,38 @@ class MultilayerNetworkTester:
         exp_graph.add_node(node1, weight=2, duration_weight=1.5)
         exp_graph.add_node(node2, weight=1, duration_weight=1)
         exp_graph.add_edge(node1, node1, weight=1)
+        exp_graph.add_edge(node1, node2, weight=1)
+        self.assert_graph_match(graph, exp_graph)
+
+    def test_group_by_beat(self):
+
+        self.current_test = "group_by_beat"
+
+        # Create midi file
+        stream = ms.converter.parse("tinyNotation: C8 D8 E4")
+        file_path = self.test_folder + self.current_test + ".mid"
+        stream.write("midi", file_path)
+
+        # Create net
+        net = MultiLayerNetwork(use_gui=False, verbosity=0, music_files=file_path, pitch=True, duration=True, group_by_beat=True)
+        net.create_net(output_txt=False)
+        graph = net.get_net()
+
+        # Create expected graph
+        note1 = ms.note.Note("C")
+        note1.quarterLength = 0.5
+        note2 = ms.note.Note("D")
+        note2.quarterLength = 0.5
+        note3 = ms.note.Note("E")
+        note3.quarterLength = 1
+        single_node1 = net.build_node(net.parse_elt(note1))
+        single_node2 = net.build_node(net.parse_elt(note2))
+        single_node3 = net.build_node(net.parse_elt(note3))
+        node1 = single_node1 + "," + single_node2 + ",{}"
+        node2 = single_node3
+        exp_graph = nx.DiGraph()
+        exp_graph.add_node(node1, weight=1, duration=[0.5,0.5], pitch_class=['C','D'])
+        exp_graph.add_node(node2, weight=1, duration=[1], pitch_class=['E'])
         exp_graph.add_edge(node1, node2, weight=1)
         self.assert_graph_match(graph, exp_graph)
 
